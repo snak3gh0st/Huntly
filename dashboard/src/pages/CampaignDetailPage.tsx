@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Send, X, Star, Eye, ChevronDown, ChevronUp, Globe, Phone, MessageCircle, Calendar, Bot, AlertTriangle, Play, ExternalLink, Pause, Trash2, MousePointerClick, Loader2, Download, Copy, Clock } from 'lucide-react';
+import { toast } from 'sonner';
 import { useCampaign, useLaunchCampaign, useStopCampaign, useDeleteCampaign, useCloneCampaign, exportCampaignCsv } from '../hooks/useCampaigns';
 import { useLeads, useApproveLead, useSkipLead, useConvertLead, useEmailPreview, useCampaignAnalytics, type LeadParams, type Lead } from '../hooks/useLeads';
 
@@ -196,9 +197,19 @@ export default function CampaignDetailPage() {
             {sendableCount > 0 && (
               <div className="flex gap-2">
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     if (!confirm(`Send NOW to all ${sendableCount} leads? (bypasses timezone scheduling)`)) return;
-                    sendableLeads.forEach((l: any) => approveMut.mutate({ id: l.id, sendNow: true }));
+                    const toastId = toast.loading(`Sending to ${sendableCount} leads...`);
+                    const results = await Promise.allSettled(
+                      sendableLeads.map((l: any) => approveMut.mutateAsync({ id: l.id, sendNow: true }))
+                    );
+                    const succeeded = results.filter(r => r.status === 'fulfilled').length;
+                    const failed = results.filter(r => r.status === 'rejected').length;
+                    if (failed === 0) {
+                      toast.success(`All ${succeeded} emails queued for sending`, { id: toastId });
+                    } else {
+                      toast.error(`${succeeded} queued, ${failed} failed`, { id: toastId });
+                    }
                   }}
                   disabled={approveMut.isPending}
                   className="flex items-center gap-2 bg-green-500 text-black px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-400 transition disabled:opacity-50"
@@ -207,9 +218,19 @@ export default function CampaignDetailPage() {
                   Send All Now ({sendableCount})
                 </button>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     if (!confirm(`Schedule ${sendableCount} leads for 9am in their timezone?`)) return;
-                    sendableLeads.forEach((l: any) => approveMut.mutate({ id: l.id, sendNow: false }));
+                    const toastId = toast.loading(`Scheduling ${sendableCount} leads...`);
+                    const results = await Promise.allSettled(
+                      sendableLeads.map((l: any) => approveMut.mutateAsync({ id: l.id, sendNow: false }))
+                    );
+                    const succeeded = results.filter(r => r.status === 'fulfilled').length;
+                    const failed = results.filter(r => r.status === 'rejected').length;
+                    if (failed === 0) {
+                      toast.success(`All ${succeeded} emails scheduled`, { id: toastId });
+                    } else {
+                      toast.error(`${succeeded} scheduled, ${failed} failed`, { id: toastId });
+                    }
                   }}
                   disabled={approveMut.isPending}
                   className="flex items-center gap-2 border border-cyan-700 text-cyan-400 px-4 py-2 rounded-lg text-sm font-medium hover:bg-cyan-400/10 transition disabled:opacity-50"
@@ -218,9 +239,19 @@ export default function CampaignDetailPage() {
                   Schedule All ({sendableCount})
                 </button>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     if (!confirm(`Skip all ${sendableCount} qualified leads?`)) return;
-                    sendableLeads.forEach((l: any) => skipMut.mutate(l.id));
+                    const toastId = toast.loading(`Skipping ${sendableCount} leads...`);
+                    const results = await Promise.allSettled(
+                      sendableLeads.map((l: any) => skipMut.mutateAsync(l.id))
+                    );
+                    const succeeded = results.filter(r => r.status === 'fulfilled').length;
+                    const failed = results.filter(r => r.status === 'rejected').length;
+                    if (failed === 0) {
+                      toast.success(`${succeeded} leads skipped`, { id: toastId });
+                    } else {
+                      toast.error(`${succeeded} skipped, ${failed} failed`, { id: toastId });
+                    }
                   }}
                   className="flex items-center gap-2 border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm hover:border-gray-600 hover:text-gray-300 transition"
                 >
@@ -310,7 +341,14 @@ export default function CampaignDetailPage() {
                         <Eye size={16} />
                       </button>
                       <button
-                        onClick={() => { if (confirm(`Send NOW to ${lead.email}?`)) approveMut.mutate({ id: lead.id, sendNow: true }); }}
+                        onClick={() => {
+                          if (!confirm(`Send NOW to ${lead.email}?`)) return;
+                          toast.promise(approveMut.mutateAsync({ id: lead.id, sendNow: true }), {
+                            loading: `Sending to ${lead.email}...`,
+                            success: `Email queued for ${lead.businessName}`,
+                            error: `Failed to send to ${lead.email}`,
+                          });
+                        }}
                         className="p-2 text-green-400 hover:bg-green-400/10 rounded-lg transition"
                         title="Send now"
                       >
@@ -355,7 +393,15 @@ export default function CampaignDetailPage() {
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-cyan-400">Email Preview</h3>
                     <button
-                      onClick={() => { if (confirm(`Send NOW to ${lead.email}?`)) { approveMut.mutate({ id: lead.id, sendNow: true }); setPreviewLead(null); } }}
+                      onClick={() => {
+                        if (!confirm(`Send NOW to ${lead.email}?`)) return;
+                        toast.promise(approveMut.mutateAsync({ id: lead.id, sendNow: true }), {
+                          loading: `Sending to ${lead.email}...`,
+                          success: `Email queued for ${lead.businessName}`,
+                          error: `Failed to send to ${lead.email}`,
+                        });
+                        setPreviewLead(null);
+                      }}
                       className="flex items-center gap-2 bg-green-500 text-black px-4 py-1.5 rounded-lg text-xs font-semibold hover:bg-green-400 transition"
                     >
                       <Send size={12} /> Send This Email
