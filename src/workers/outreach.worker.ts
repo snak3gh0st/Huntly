@@ -160,6 +160,71 @@ function tomorrowAt9am(): Date {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Timezone-aware scheduling                                          */
+/* ------------------------------------------------------------------ */
+
+function getLeadTimezone(lead: FullLead): string {
+  // Google Maps source data includes time_zone field
+  const tz = (lead.sourceData as any)?.time_zone;
+  if (tz && typeof tz === 'string') return tz;
+
+  // Fallback: guess from region
+  const region = (lead.region ?? '').toLowerCase();
+  if (region.includes('dubai') || region.includes('uae')) return 'Asia/Dubai';
+  if (region.includes('london') || region.includes('uk')) return 'Europe/London';
+  if (
+    region.includes('brazil') ||
+    region.includes('brasil') ||
+    region.includes('são paulo') ||
+    region.includes('sao paulo')
+  )
+    return 'America/Sao_Paulo';
+  if (
+    region.includes('miami') ||
+    region.includes('new york') ||
+    region.includes(' us')
+  )
+    return 'America/New_York';
+  if (region.includes('tokyo') || region.includes('japan'))
+    return 'Asia/Tokyo';
+  if (region.includes('sydney') || region.includes('australia'))
+    return 'Australia/Sydney';
+  if (
+    region.includes('paris') ||
+    region.includes('france') ||
+    region.includes('germany') ||
+    region.includes('spain') ||
+    region.includes('italy')
+  )
+    return 'Europe/Paris';
+
+  return 'UTC'; // fallback
+}
+
+function getNextSendTime(timezone: string): Date {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hour: 'numeric',
+    hour12: false,
+  });
+  const localHour = parseInt(formatter.format(now), 10);
+
+  if (localHour < 9) {
+    // Today at 9am in their timezone
+    const diff = 9 - localHour;
+    return new Date(now.getTime() + diff * 3600000);
+  } else if (localHour < 17) {
+    // During business hours — send now
+    return now;
+  } else {
+    // After 5pm — schedule for tomorrow 9am
+    const hoursUntil9am = 24 - localHour + 9;
+    return new Date(now.getTime() + hoursUntil9am * 3600000);
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /*  Job types                                                          */
 /* ------------------------------------------------------------------ */
 
@@ -205,6 +270,21 @@ export const outreachWorker = new Worker<SendDripJobData | Record<string, never>
         'send-drip',
         { leadId, sequenceNumber },
         { delay: tomorrow.getTime() - Date.now() },
+      );
+      return;
+    }
+
+    // 3b. Timezone-aware scheduling: if outside business hours in lead's
+    //     timezone, re-schedule for their next 9am
+    const leadTimezone = getLeadTimezone(lead);
+    const sendTime = getNextSendTime(leadTimezone);
+    const delayUntilSend = sendTime.getTime() - Date.now();
+    if (delayUntilSend > 60_000) {
+      // More than 1 minute away — re-queue with delay
+      await outreachQueue.add(
+        'send-drip',
+        { leadId, sequenceNumber },
+        { delay: delayUntilSend },
       );
       return;
     }
@@ -259,7 +339,7 @@ export const outreachWorker = new Worker<SendDripJobData | Record<string, never>
       await leadRepo.updateStatus(leadId, 'contacted');
     }
 
-    // 9. Schedule next drip if not last email
+    // 9. Schedule next drip if not last email (timezone-aware: land at 9am in lead's TZ)
     if (sequenceNumber < LAST_SEQUENCE) {
       const nextStep = DRIP_SEQUENCE.find(
         (s) => s.sequenceNumber === sequenceNumber + 1,
@@ -267,12 +347,22 @@ export const outreachWorker = new Worker<SendDripJobData | Record<string, never>
       const currentStep = DRIP_SEQUENCE.find(
         (s) => s.sequenceNumber === sequenceNumber,
       )!;
-      const delayMs =
-        (nextStep.delayDays - currentStep.delayDays) * 86_400_000;
+      const baseDays = nextStep.delayDays - currentStep.delayDays;
+      // Calculate delay to land at lead's next 9am + baseDays offset
+      const futureDate = new Date(Date.now() + baseDays * 86_400_000);
+      const futureFormatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: leadTimezone,
+        hour: 'numeric',
+        hour12: false,
+      });
+      const futureHour = parseInt(futureFormatter.format(futureDate), 10);
+      // Adjust so it arrives at 9am in their TZ
+      const hourAdjust = 9 - futureHour;
+      const delayMs = baseDays * 86_400_000 + hourAdjust * 3600_000;
       await outreachQueue.add(
         'send-drip',
         { leadId, sequenceNumber: sequenceNumber + 1 },
-        { delay: delayMs },
+        { delay: Math.max(delayMs, 60_000) },
       );
     }
 

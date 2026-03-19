@@ -137,8 +137,13 @@ export async function qualifyLead(
   }
 
   // 2. Call AI for scoring + content generation
+  let systemPrompt = SYSTEM_PROMPT;
+  if (input.hasChatbot) {
+    systemPrompt += `\n\nIMPORTANT: This business already has a chatbot. Frame the personalized_hook as an UPGRADE pitch — focus on what SigmaAI does better (multi-language, voice messages, image analysis, calendar integration, customer memory). Don't pitch "get a chatbot" — pitch "upgrade to a smarter one."`;
+  }
+
   const raw = await callAI({
-    systemPrompt: SYSTEM_PROMPT,
+    systemPrompt,
     userPrompt: buildUserPrompt(input),
     json: true,
   });

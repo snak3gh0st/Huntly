@@ -96,6 +96,59 @@ export default async function outreachRoutes(app: FastifyInstance) {
     });
   });
 
+  /* GET /scoring-insights — conversion rates grouped by score range */
+  app.get('/scoring-insights', async (_request, reply) => {
+    const rows = await prisma.$queryRawUnsafe<
+      Array<{
+        range: string;
+        total: bigint;
+        contacted: bigint;
+        replied: bigint;
+        converted: bigint;
+      }>
+    >(`
+      SELECT
+        CASE
+          WHEN lq.fit_score >= 80 THEN '80-100'
+          WHEN lq.fit_score >= 70 THEN '70-79'
+          WHEN lq.fit_score >= 40 THEN '40-69'
+          ELSE '0-39'
+        END AS range,
+        count(*) AS total,
+        count(*) FILTER (WHERE l.status IN ('contacted','replied','converted')) AS contacted,
+        count(*) FILTER (WHERE l.status IN ('replied','converted')) AS replied,
+        count(*) FILTER (WHERE l.status = 'converted') AS converted
+      FROM lead_qualifications lq
+      JOIN leads l ON l.id = lq.lead_id
+      GROUP BY 1
+      ORDER BY
+        CASE
+          WHEN lq.fit_score >= 80 THEN 1
+          WHEN lq.fit_score >= 70 THEN 2
+          WHEN lq.fit_score >= 40 THEN 3
+          ELSE 4
+        END
+    `);
+
+    const ranges = rows.map((r) => {
+      const total = Number(r.total);
+      const contacted = Number(r.contacted);
+      const replied = Number(r.replied);
+      const converted = Number(r.converted);
+      return {
+        range: r.range,
+        total,
+        contacted,
+        replied,
+        converted,
+        replyRate: contacted > 0 ? Math.round((replied / contacted) * 1000) / 10 : 0,
+        conversionRate: contacted > 0 ? Math.round((converted / contacted) * 1000) / 10 : 0,
+      };
+    });
+
+    return reply.send({ ranges });
+  });
+
   /* GET /pipeline — pipeline status: queue depths + lead stats */
   app.get('/pipeline', async (_request, reply) => {
     const connection = redis as any;

@@ -165,6 +165,27 @@ export function useEmailPreview(leadId: string | null) {
   });
 }
 
+export interface ScoringRange {
+  range: string;
+  total: number;
+  contacted: number;
+  replied: number;
+  converted: number;
+  replyRate: number;
+  conversionRate: number;
+}
+
+export interface ScoringInsights {
+  ranges: ScoringRange[];
+}
+
+export function useScoringInsights() {
+  return useQuery({
+    queryKey: ['scoring-insights'],
+    queryFn: () => api.get<ScoringInsights>('/scoring-insights'),
+  });
+}
+
 export function usePauseDrip() {
   const qc = useQueryClient();
   return useMutation({

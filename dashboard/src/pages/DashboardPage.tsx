@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Users, Mail, MousePointerClick, MessageSquare, Loader2, CheckCircle2, AlertCircle, Clock, Zap, Globe, MailCheck } from 'lucide-react';
-import { useFunnel, useStats, usePipeline } from '../hooks/useLeads';
+import { useFunnel, useStats, usePipeline, useScoringInsights } from '../hooks/useLeads';
 import { useCampaigns } from '../hooks/useCampaigns';
 
 const FUNNEL_STEPS = [
@@ -24,6 +24,7 @@ export default function DashboardPage() {
   const { data: stats, isLoading: statsLoading } = useStats();
   const { data: campaigns } = useCampaigns();
   const { data: pipeline } = usePipeline();
+  const { data: scoringInsights } = useScoringInsights();
 
   const totalLeads = funnel ? Object.values(funnel).reduce((a: number, b: number) => a + b, 0) : 0;
   const maxCount = funnel ? Math.max(...Object.values(funnel).map(Number), 1) : 1;
@@ -199,6 +200,49 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Scoring Insights */}
+      {scoringInsights?.ranges && scoringInsights.ranges.length > 0 && (
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+          <h2 className="text-lg font-semibold mb-4">Scoring Insights</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-gray-400 uppercase tracking-wider border-b border-gray-800">
+                  <th className="text-left py-2 pr-4">Score Range</th>
+                  <th className="text-right py-2 px-3">Total</th>
+                  <th className="text-right py-2 px-3">Contacted</th>
+                  <th className="text-right py-2 px-3">Replied</th>
+                  <th className="text-right py-2 px-3">Converted</th>
+                  <th className="text-right py-2 px-3">Reply Rate</th>
+                  <th className="text-right py-2 pl-3">Conv. Rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scoringInsights.ranges.map((r) => {
+                  const rowColor =
+                    r.conversionRate >= 5
+                      ? 'bg-green-500/5 border-green-500/10'
+                      : r.conversionRate >= 2
+                        ? 'bg-yellow-500/5 border-yellow-500/10'
+                        : 'bg-red-500/5 border-red-500/10';
+                  return (
+                    <tr key={r.range} className={`border-b border-gray-800/50 ${rowColor}`}>
+                      <td className="py-2.5 pr-4 font-medium">{r.range}</td>
+                      <td className="text-right py-2.5 px-3 text-gray-300">{r.total}</td>
+                      <td className="text-right py-2.5 px-3 text-gray-300">{r.contacted}</td>
+                      <td className="text-right py-2.5 px-3 text-gray-300">{r.replied}</td>
+                      <td className="text-right py-2.5 px-3 text-gray-300">{r.converted}</td>
+                      <td className="text-right py-2.5 px-3 font-mono text-cyan-400">{r.replyRate}%</td>
+                      <td className="text-right py-2.5 pl-3 font-mono font-bold text-green-400">{r.conversionRate}%</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Campaigns */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">

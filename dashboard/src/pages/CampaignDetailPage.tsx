@@ -247,8 +247,11 @@ export default function CampaignDetailPage() {
                     </span>
                   )}
                   {enrichment?.hasChatbot && (
-                    <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded-md flex items-center gap-1">
-                      <Bot size={10} /> Chatbot
+                    <span
+                      className="text-[10px] bg-orange-500/20 text-orange-400 px-2 py-1 rounded-md flex items-center gap-1"
+                      title="Has existing chatbot — upgrade pitch"
+                    >
+                      <Bot size={10} /> Competitor
                     </span>
                   )}
                   {enrichment?.hasOnlineBooking && (
