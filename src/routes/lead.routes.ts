@@ -115,16 +115,26 @@ export default async function leadRoutes(app: FastifyInstance) {
 
       const sendNow = request.query.sendNow === 'true';
 
-      // Dynamic import to avoid circular dependency at module load
+      if (sendNow) {
+        // Send immediately — API waits for actual Resend delivery
+        const { sendDripDirect } = await import('../workers/outreach.worker.js');
+        const result = await sendDripDirect(lead.id, 1);
+        if (result.status === 'failed') {
+          return reply.status(500).send({ error: result.error, leadId: lead.id });
+        }
+        return reply.send({ status: 'sent', leadId: lead.id, sendNow: true });
+      }
+
+      // Scheduled send — enqueue for timezone-aware delivery
       const { outreachQueue } = await import('../workers/qualify.worker.js');
 
       await outreachQueue.add(
         'send-drip',
-        { leadId: lead.id, sequenceNumber: 1, sendNow },
+        { leadId: lead.id, sequenceNumber: 1, sendNow: false },
         { jobId: `outreach-${lead.id}-${Date.now()}` },
       );
 
-      return reply.send({ status: 'approved', leadId: lead.id, sendNow });
+      return reply.send({ status: 'scheduled', leadId: lead.id, sendNow: false });
     },
   );
 

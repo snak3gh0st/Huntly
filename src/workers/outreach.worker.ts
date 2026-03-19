@@ -259,6 +259,92 @@ interface SendDripJobData {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Direct send (used by API route for sendNow + worker after sched.)  */
+/* ------------------------------------------------------------------ */
+
+export async function sendDripDirect(
+  leadId: string,
+  sequenceNumber: number,
+): Promise<{ status: 'sent' | 'failed' | 'skipped'; error?: string }> {
+  const lead = await leadRepo.findById(leadId);
+  if (!lead) return { status: 'skipped' };
+  if (await shouldStop(lead)) return { status: 'skipped' };
+
+  const lang = detectLanguage(lead.region ?? '');
+  const mergeFields = buildMergeFields(lead, lang);
+  const variant: 'A' | 'B' = Math.random() < 0.5 ? 'A' : 'B';
+  const subject = getSubject(sequenceNumber, mergeFields, variant);
+  const templateName = getTemplateName(sequenceNumber, lang);
+  const unsubscribeUrl = mergeFields.unsubscribe_url;
+
+  const emailRecord = await outreachRepo.create({
+    lead: { connect: { id: leadId } },
+    campaign: { connect: { id: lead.campaignId } },
+    sequenceNumber,
+    subject,
+    variant,
+    bodyHtml: '',
+    status: 'scheduled',
+    scheduledFor: new Date(),
+  });
+
+  let resendMessageId: string;
+  try {
+    resendMessageId = await sendEmail({
+      to: lead.email!,
+      subject,
+      templateName,
+      mergeFields,
+      unsubscribeUrl,
+    });
+  } catch (err) {
+    console.error(`[outreach] Failed to send email to ${lead.email}:`, (err as Error).message);
+    await outreachRepo.updateStatus(emailRecord.id, 'failed');
+    await leadRepo.updateStatus(leadId, lead.status, (err as Error).message);
+    return { status: 'failed', error: (err as Error).message };
+  }
+
+  await outreachRepo.updateStatus(emailRecord.id, 'sending', {
+    sentAt: new Date(),
+    resendMessageId,
+  });
+  await incrementSendCount();
+
+  if (sequenceNumber === 1) {
+    await leadRepo.updateStatus(leadId, 'contacted');
+  }
+
+  // Schedule next drip (timezone-aware: land at 9am in lead's TZ)
+  if (sequenceNumber < LAST_SEQUENCE) {
+    const nextStep = DRIP_SEQUENCE.find(s => s.sequenceNumber === sequenceNumber + 1)!;
+    const currentStep = DRIP_SEQUENCE.find(s => s.sequenceNumber === sequenceNumber)!;
+    const baseDays = nextStep.delayDays - currentStep.delayDays;
+    const leadTimezone = getLeadTimezone(lead);
+    const futureDate = new Date(Date.now() + baseDays * 86_400_000);
+    const futureFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: leadTimezone,
+      hour: 'numeric',
+      hour12: false,
+    });
+    const futureHour = parseInt(futureFormatter.format(futureDate), 10);
+    const hourAdjust = 9 - futureHour;
+    const delayMs = baseDays * 86_400_000 + hourAdjust * 3600_000;
+    await outreachQueue.add(
+      'send-drip',
+      { leadId, sequenceNumber: sequenceNumber + 1 },
+      { delay: Math.max(delayMs, 60_000) },
+    );
+  }
+
+  if (sequenceNumber === LAST_SEQUENCE) {
+    const expiresAt = new Date(Date.now() + DEMO_EXPIRY_DAYS * 86_400_000);
+    await leadRepo.setDemoExpiry(leadId, expiresAt);
+  }
+
+  return { status: 'sent' };
+}
+
+/* ------------------------------------------------------------------ */
 /*  Worker                                                             */
 /* ------------------------------------------------------------------ */
 
@@ -281,15 +367,19 @@ export const outreachWorker = new Worker<SendDripJobData | Record<string, never>
     /* ---------- send-drip ---------- */
     const { leadId, sequenceNumber, sendNow } = job.data as SendDripJobData;
 
-    // 1. Fetch lead (full include)
+    // sendNow jobs are handled directly by the API route now,
+    // but keep support here for backwards compatibility
+    if (sendNow) {
+      await sendDripDirect(leadId, sequenceNumber);
+      return;
+    }
+
+    // Scheduled send: check daily cap + timezone
     const lead = await leadRepo.findById(leadId);
     if (!lead) return;
-
-    // 2. Check stop conditions
     if (await shouldStop(lead)) return;
 
-    // 3. Check daily cap — re-schedule for tomorrow 9am if exhausted (skip if sendNow)
-    if (!sendNow && !(await canSendToday())) {
+    if (!(await canSendToday())) {
       const tomorrow = tomorrowAt9am();
       await outreachQueue.add(
         'send-drip',
@@ -299,105 +389,20 @@ export const outreachWorker = new Worker<SendDripJobData | Record<string, never>
       return;
     }
 
-    // 3b. Timezone-aware scheduling (skip if sendNow)
-    if (!sendNow) {
-      const leadTimezone = getLeadTimezone(lead);
-      const sendTime = getNextSendTime(leadTimezone);
-      const delayUntilSend = sendTime.getTime() - Date.now();
-      if (delayUntilSend > 60_000) {
-        await outreachQueue.add(
-          'send-drip',
-          { leadId, sequenceNumber },
-          { delay: delayUntilSend },
-        );
-        return;
-      }
-    }
-
-    // 4. Build merge fields + detect language from region
-    const lang = detectLanguage(lead.region ?? '');
-    const mergeFields = buildMergeFields(lead, lang);
-    const variant: 'A' | 'B' = Math.random() < 0.5 ? 'A' : 'B';
-    const subject = getSubject(sequenceNumber, mergeFields, variant);
-    const templateName = getTemplateName(sequenceNumber, lang);
-    const unsubscribeUrl = mergeFields.unsubscribe_url;
-
-    // 5. Create outreach email record (status: scheduled)
-    const emailRecord = await outreachRepo.create({
-      lead: { connect: { id: leadId } },
-      campaign: { connect: { id: lead.campaignId } },
-      sequenceNumber,
-      subject,
-      variant,
-      bodyHtml: '',
-      status: 'scheduled',
-      scheduledFor: new Date(),
-    });
-
-    // 6. Send email via Resend
-    let resendMessageId: string;
-    try {
-      resendMessageId = await sendEmail({
-        to: lead.email!,
-        subject,
-        templateName,
-        mergeFields,
-        unsubscribeUrl,
-      });
-    } catch (err) {
-      // Resend 4xx or other failure — mark email failed, log, return
-      console.error(`[outreach] Failed to send email to ${lead.email}:`, (err as Error).message);
-      await outreachRepo.updateStatus(emailRecord.id, 'failed');
-      await leadRepo.updateStatus(leadId, lead.status, (err as Error).message);
+    const leadTimezone = getLeadTimezone(lead);
+    const sendTime = getNextSendTime(leadTimezone);
+    const delayUntilSend = sendTime.getTime() - Date.now();
+    if (delayUntilSend > 60_000) {
+      await outreachQueue.add(
+        'send-drip',
+        { leadId, sequenceNumber },
+        { delay: delayUntilSend },
+      );
       return;
     }
 
-    // 7. Update email record: status → sending, set resendMessageId + sentAt
-    await outreachRepo.updateStatus(emailRecord.id, 'sending', {
-      sentAt: new Date(),
-      resendMessageId,
-    });
-
-    // Increment daily send counter
-    await incrementSendCount();
-
-    // 8. Update lead status to 'contacted' on first email
-    if (sequenceNumber === 1) {
-      await leadRepo.updateStatus(leadId, 'contacted');
-    }
-
-    // 9. Schedule next drip if not last email (timezone-aware: land at 9am in lead's TZ)
-    if (sequenceNumber < LAST_SEQUENCE) {
-      const nextStep = DRIP_SEQUENCE.find(
-        (s) => s.sequenceNumber === sequenceNumber + 1,
-      )!;
-      const currentStep = DRIP_SEQUENCE.find(
-        (s) => s.sequenceNumber === sequenceNumber,
-      )!;
-      const baseDays = nextStep.delayDays - currentStep.delayDays;
-      // Calculate delay to land at lead's next 9am + baseDays offset
-      const futureDate = new Date(Date.now() + baseDays * 86_400_000);
-      const futureFormatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: leadTimezone,
-        hour: 'numeric',
-        hour12: false,
-      });
-      const futureHour = parseInt(futureFormatter.format(futureDate), 10);
-      // Adjust so it arrives at 9am in their TZ
-      const hourAdjust = 9 - futureHour;
-      const delayMs = baseDays * 86_400_000 + hourAdjust * 3600_000;
-      await outreachQueue.add(
-        'send-drip',
-        { leadId, sequenceNumber: sequenceNumber + 1 },
-        { delay: Math.max(delayMs, 60_000) },
-      );
-    }
-
-    // 10. After last email: set demo expiry to 60 days from now
-    if (sequenceNumber === LAST_SEQUENCE) {
-      const expiresAt = new Date(Date.now() + DEMO_EXPIRY_DAYS * 86_400_000);
-      await leadRepo.setDemoExpiry(leadId, expiresAt);
-    }
+    // Ready to send now
+    await sendDripDirect(leadId, sequenceNumber);
   },
   {
     connection,

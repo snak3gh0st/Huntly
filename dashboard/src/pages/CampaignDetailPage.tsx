@@ -199,16 +199,22 @@ export default function CampaignDetailPage() {
                 <button
                   onClick={async () => {
                     if (!confirm(`Send NOW to all ${sendableCount} leads? (bypasses timezone scheduling)`)) return;
-                    const toastId = toast.loading(`Sending to ${sendableCount} leads...`);
-                    const results = await Promise.allSettled(
-                      sendableLeads.map((l: any) => approveMut.mutateAsync({ id: l.id, sendNow: true }))
-                    );
-                    const succeeded = results.filter(r => r.status === 'fulfilled').length;
-                    const failed = results.filter(r => r.status === 'rejected').length;
+                    const toastId = toast.loading(`Sending 0/${sendableCount}...`);
+                    let sent = 0;
+                    let failed = 0;
+                    for (let i = 0; i < sendableLeads.length; i += 3) {
+                      const batch = sendableLeads.slice(i, i + 3);
+                      const results = await Promise.allSettled(
+                        batch.map((l: any) => approveMut.mutateAsync({ id: l.id, sendNow: true }))
+                      );
+                      sent += results.filter(r => r.status === 'fulfilled').length;
+                      failed += results.filter(r => r.status === 'rejected').length;
+                      toast.loading(`Sending ${sent + failed}/${sendableCount}... (${sent} sent${failed ? `, ${failed} failed` : ''})`, { id: toastId });
+                    }
                     if (failed === 0) {
-                      toast.success(`All ${succeeded} emails queued for sending`, { id: toastId });
+                      toast.success(`All ${sent} emails sent!`, { id: toastId });
                     } else {
-                      toast.error(`${succeeded} queued, ${failed} failed`, { id: toastId });
+                      toast.error(`${sent} sent, ${failed} failed`, { id: toastId });
                     }
                   }}
                   disabled={approveMut.isPending}
@@ -345,7 +351,7 @@ export default function CampaignDetailPage() {
                           if (!confirm(`Send NOW to ${lead.email}?`)) return;
                           toast.promise(approveMut.mutateAsync({ id: lead.id, sendNow: true }), {
                             loading: `Sending to ${lead.email}...`,
-                            success: `Email queued for ${lead.businessName}`,
+                            success: `Email sent to ${lead.businessName}`,
                             error: `Failed to send to ${lead.email}`,
                           });
                         }}
@@ -397,7 +403,7 @@ export default function CampaignDetailPage() {
                         if (!confirm(`Send NOW to ${lead.email}?`)) return;
                         toast.promise(approveMut.mutateAsync({ id: lead.id, sendNow: true }), {
                           loading: `Sending to ${lead.email}...`,
-                          success: `Email queued for ${lead.businessName}`,
+                          success: `Email sent to ${lead.businessName}`,
                           error: `Failed to send to ${lead.email}`,
                         });
                         setPreviewLead(null);
