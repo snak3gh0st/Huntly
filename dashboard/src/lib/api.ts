@@ -2,15 +2,14 @@ const BASE = '/api';
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const key = localStorage.getItem('huntly_api_key');
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
+  const headers: Record<string, string> = {};
   if (key) headers['x-api-key'] = key;
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
 
   const res = await fetch(`${BASE}${path}`, {
     method,
     headers,
-    body: body ? JSON.stringify(body) : undefined,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
   if (!res.ok) {
