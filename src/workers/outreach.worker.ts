@@ -37,8 +37,10 @@ const BASE_CAP = 20;
 const RAMP_FACTOR = 1.2;
 const MAX_CAP = 50;
 
-/** Configurable — set to the date you start sending. */
-export const WARMUP_START_DATE = new Date('2026-04-01T00:00:00Z');
+/** Reads WARMUP_START_DATE from env, defaults to today if not set. */
+export const WARMUP_START_DATE = process.env.WARMUP_START_DATE
+  ? new Date(process.env.WARMUP_START_DATE)
+  : new Date();
 
 export function getDailyCap(startDate: Date): number {
   const daysSinceStart = Math.floor(

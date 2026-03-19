@@ -75,7 +75,7 @@ export async function searchBusinesses(
         category: item.type ?? item.category ?? '',
         address: item.full_address ?? item.address ?? '',
         phone: item.phone ?? undefined,
-        websiteUrl: item.site ?? undefined,
+        websiteUrl: item.website ?? item.site ?? undefined,
         googleMapsPlaceId: placeId,
         googleRating: item.rating != null ? Number(item.rating) : undefined,
         googleReviewCount: item.reviews != null ? Number(item.reviews) : undefined,
