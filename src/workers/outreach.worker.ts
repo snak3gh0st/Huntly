@@ -204,9 +204,11 @@ export const outreachWorker = new Worker<SendDripJobData | Record<string, never>
         mergeFields,
         unsubscribeUrl,
       });
-    } catch {
-      // Resend 4xx or other failure — mark email failed, return
+    } catch (err) {
+      // Resend 4xx or other failure — mark email failed, log, return
+      console.error(`[outreach] Failed to send email to ${lead.email}:`, (err as Error).message);
       await outreachRepo.updateStatus(emailRecord.id, 'failed');
+      await leadRepo.updateStatus(leadId, lead.status, (err as Error).message);
       return;
     }
 
