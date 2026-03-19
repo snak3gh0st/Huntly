@@ -92,7 +92,8 @@ export function useStats() {
 export function useApproveLead() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.post(`/leads/${id}/approve`),
+    mutationFn: ({ id, sendNow = false }: { id: string; sendNow?: boolean }) =>
+      api.post(`/leads/${id}/approve${sendNow ? '?sendNow=true' : ''}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['leads'] });
       qc.invalidateQueries({ queryKey: ['funnel'] });

@@ -92,7 +92,8 @@ export default async function leadRoutes(app: FastifyInstance) {
   });
 
   /* POST /leads/:id/approve — enqueue outreach for qualified leads with email */
-  app.post<{ Params: LeadIdParams }>(
+  /* Query param ?sendNow=true bypasses timezone scheduling */
+  app.post<{ Params: LeadIdParams; Querystring: { sendNow?: string } }>(
     '/leads/:id/approve',
     async (request, reply) => {
       const lead = await leadRepo.findById(request.params.id);
@@ -112,16 +113,18 @@ export default async function leadRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: 'Lead has no email address' });
       }
 
+      const sendNow = request.query.sendNow === 'true';
+
       // Dynamic import to avoid circular dependency at module load
       const { outreachQueue } = await import('../workers/qualify.worker.js');
 
       await outreachQueue.add(
         'send-drip',
-        { leadId: lead.id, sequenceNumber: 1 },
-        { jobId: `outreach-${lead.id}` },
+        { leadId: lead.id, sequenceNumber: 1, sendNow },
+        { jobId: `outreach-${lead.id}-${Date.now()}` },
       );
 
-      return reply.send({ status: 'approved', leadId: lead.id });
+      return reply.send({ status: 'approved', leadId: lead.id, sendNow });
     },
   );
 

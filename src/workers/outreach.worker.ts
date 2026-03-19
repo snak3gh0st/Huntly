@@ -255,6 +255,7 @@ function getNextSendTime(timezone: string): Date {
 interface SendDripJobData {
   leadId: string;
   sequenceNumber: number;
+  sendNow?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -278,7 +279,7 @@ export const outreachWorker = new Worker<SendDripJobData | Record<string, never>
     }
 
     /* ---------- send-drip ---------- */
-    const { leadId, sequenceNumber } = job.data as SendDripJobData;
+    const { leadId, sequenceNumber, sendNow } = job.data as SendDripJobData;
 
     // 1. Fetch lead (full include)
     const lead = await leadRepo.findById(leadId);
@@ -287,8 +288,8 @@ export const outreachWorker = new Worker<SendDripJobData | Record<string, never>
     // 2. Check stop conditions
     if (await shouldStop(lead)) return;
 
-    // 3. Check daily cap — re-schedule for tomorrow 9am if exhausted
-    if (!(await canSendToday())) {
+    // 3. Check daily cap — re-schedule for tomorrow 9am if exhausted (skip if sendNow)
+    if (!sendNow && !(await canSendToday())) {
       const tomorrow = tomorrowAt9am();
       await outreachQueue.add(
         'send-drip',
@@ -298,19 +299,19 @@ export const outreachWorker = new Worker<SendDripJobData | Record<string, never>
       return;
     }
 
-    // 3b. Timezone-aware scheduling: if outside business hours in lead's
-    //     timezone, re-schedule for their next 9am
-    const leadTimezone = getLeadTimezone(lead);
-    const sendTime = getNextSendTime(leadTimezone);
-    const delayUntilSend = sendTime.getTime() - Date.now();
-    if (delayUntilSend > 60_000) {
-      // More than 1 minute away — re-queue with delay
-      await outreachQueue.add(
-        'send-drip',
-        { leadId, sequenceNumber },
-        { delay: delayUntilSend },
-      );
-      return;
+    // 3b. Timezone-aware scheduling (skip if sendNow)
+    if (!sendNow) {
+      const leadTimezone = getLeadTimezone(lead);
+      const sendTime = getNextSendTime(leadTimezone);
+      const delayUntilSend = sendTime.getTime() - Date.now();
+      if (delayUntilSend > 60_000) {
+        await outreachQueue.add(
+          'send-drip',
+          { leadId, sequenceNumber },
+          { delay: delayUntilSend },
+        );
+        return;
+      }
     }
 
     // 4. Build merge fields + detect language from region
