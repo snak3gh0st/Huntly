@@ -91,13 +91,45 @@ export default function CampaignDetailPage() {
         );
       })()}
 
-      {/* Section heading */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">
-          {filter.status === 'qualified' ? 'Ready for Review' : filter.status ? `${filter.status} leads` : 'All Leads'}
-          <span className="text-gray-500 text-sm font-normal ml-2">({leads?.length ?? 0})</span>
-        </h2>
-      </div>
+      {/* Section heading + bulk actions */}
+      {(() => {
+        const sendableLeads = (leads ?? []).filter((l: any) => l.status === 'qualified' && l.email && l.qualification);
+        const sendableCount = sendableLeads.length;
+
+        return (
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">
+              {filter.status === 'qualified' ? 'Ready for Review' : filter.status ? `${filter.status} leads` : 'All Leads'}
+              <span className="text-gray-500 text-sm font-normal ml-2">({leads?.length ?? 0})</span>
+            </h2>
+            {sendableCount > 0 && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    if (!confirm(`Send outreach emails to all ${sendableCount} qualified leads with emails?`)) return;
+                    sendableLeads.forEach((l: any) => approveMut.mutate(l.id));
+                  }}
+                  disabled={approveMut.isPending}
+                  className="flex items-center gap-2 bg-green-500 text-black px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-400 transition disabled:opacity-50"
+                >
+                  <Send size={14} />
+                  Send All ({sendableCount})
+                </button>
+                <button
+                  onClick={() => {
+                    if (!confirm(`Skip all ${sendableCount} qualified leads?`)) return;
+                    sendableLeads.forEach((l: any) => skipMut.mutate(l.id));
+                  }}
+                  className="flex items-center gap-2 border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm hover:border-gray-600 hover:text-gray-300 transition"
+                >
+                  <X size={14} />
+                  Skip All
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Lead Cards */}
       <div className="space-y-3">
