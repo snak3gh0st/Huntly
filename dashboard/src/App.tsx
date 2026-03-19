@@ -7,6 +7,7 @@ import CampaignsPage from './pages/CampaignsPage';
 import CampaignDetailPage from './pages/CampaignDetailPage';
 import LeadsPage from './pages/LeadsPage';
 import EmailsPage from './pages/EmailsPage';
+import SettingsPage from './pages/SettingsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,6 +40,7 @@ export default function App() {
             <Route path="/leads" element={<LeadsPage />} />
             <Route path="/leads/:id" element={<LeadsPage />} />
             <Route path="/emails" element={<EmailsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

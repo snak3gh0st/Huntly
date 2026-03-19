@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
-import { Plus, Rocket, Pause, Trash2, Play } from 'lucide-react';
-import { useCampaigns, useCreateCampaign, useLaunchCampaign, useStopCampaign, useDeleteCampaign } from '../hooks/useCampaigns';
+import { Link, useNavigate } from 'react-router-dom';
+import { Plus, Rocket, Pause, Trash2, Play, Copy } from 'lucide-react';
+import { useCampaigns, useCreateCampaign, useLaunchCampaign, useStopCampaign, useDeleteCampaign, useCloneCampaign } from '../hooks/useCampaigns';
 
 const statusColor: Record<string, string> = {
   active: 'bg-green-500/10 text-green-400 border-green-500/20',
@@ -12,10 +12,12 @@ const statusColor: Record<string, string> = {
 
 export default function CampaignsPage() {
   const { data: campaigns, isLoading } = useCampaigns();
+  const navigate = useNavigate();
   const createMutation = useCreateCampaign();
   const launchMutation = useLaunchCampaign();
   const stopMutation = useStopCampaign();
   const deleteMutation = useDeleteCampaign();
+  const cloneMutation = useCloneCampaign();
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
   const [vertical, setVertical] = useState('');
@@ -158,6 +160,14 @@ export default function CampaignsPage() {
                     Resume
                   </button>
                 )}
+                <button
+                  onClick={() => cloneMutation.mutate(c.id, { onSuccess: (data) => navigate(`/campaigns/${data.id}`) })}
+                  disabled={cloneMutation.isPending}
+                  className="flex items-center gap-1.5 rounded-lg border border-gray-700 px-2.5 py-1.5 text-xs font-medium text-gray-400 hover:border-gray-600 hover:text-gray-300 disabled:opacity-50 transition-colors"
+                  title="Clone campaign"
+                >
+                  <Copy size={14} />
+                </button>
                 <button
                   onClick={() => { if (confirm(`Delete campaign "${c.name}" and ALL its leads? This cannot be undone.`)) deleteMutation.mutate(c.id); }}
                   className="flex items-center gap-1.5 rounded-lg bg-red-500/10 border border-red-500/20 px-2.5 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors"

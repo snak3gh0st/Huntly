@@ -66,3 +66,25 @@ export function useDeleteCampaign() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['campaigns'] }),
   });
 }
+
+export function useCloneCampaign() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post<Campaign>(`/campaigns/${id}/clone`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['campaigns'] }),
+  });
+}
+
+export async function exportCampaignCsv(id: string): Promise<void> {
+  const key = localStorage.getItem('huntly_api_key') || '';
+  const res = await fetch(`/api/campaigns/${id}/export`, {
+    headers: { 'x-api-key': key },
+  });
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `campaign-${id}-leads.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}

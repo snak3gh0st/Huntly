@@ -21,6 +21,16 @@ interface LeadIdParams {
   id: string;
 }
 
+interface BlacklistBody {
+  phone?: string;
+  domain?: string;
+  reason: string;
+}
+
+interface BlacklistIdParams {
+  id: string;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Plugin                                                             */
 /* ------------------------------------------------------------------ */
@@ -212,5 +222,46 @@ export default async function outreachRoutes(app: FastifyInstance) {
       recentErrors,
       recentActivity,
     });
+  });
+
+  /* ------------------------------------------------------------------ */
+  /*  Blacklist (excluded_clients) CRUD                                  */
+  /* ------------------------------------------------------------------ */
+
+  /* GET /blacklist — list all excluded clients */
+  app.get('/blacklist', async (_request, reply) => {
+    const items = await prisma.excludedClient.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+    return reply.send(items);
+  });
+
+  /* POST /blacklist — add an exclusion */
+  app.post<{ Body: BlacklistBody }>('/blacklist', async (request, reply) => {
+    const { phone, domain, reason } = request.body;
+
+    if (!phone && !domain) {
+      return reply.status(400).send({ error: 'Either phone or domain is required' });
+    }
+
+    const item = await prisma.excludedClient.create({
+      data: { phone: phone || null, domain: domain || null, reason },
+    });
+
+    return reply.status(201).send(item);
+  });
+
+  /* DELETE /blacklist/:id — remove an exclusion */
+  app.delete<{ Params: BlacklistIdParams }>('/blacklist/:id', async (request, reply) => {
+    const existing = await prisma.excludedClient.findUnique({
+      where: { id: request.params.id },
+    });
+
+    if (!existing) {
+      return reply.status(404).send({ error: 'Exclusion not found' });
+    }
+
+    await prisma.excludedClient.delete({ where: { id: request.params.id } });
+    return reply.send({ status: 'deleted', id: request.params.id });
   });
 }

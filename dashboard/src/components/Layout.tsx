@@ -1,11 +1,12 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Megaphone, Users, Mail, LogOut } from 'lucide-react';
+import { LayoutDashboard, Megaphone, Users, Mail, Settings, LogOut } from 'lucide-react';
 
 const nav = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/campaigns', label: 'Campaigns', icon: Megaphone },
   { to: '/leads', label: 'Leads', icon: Users },
   { to: '/emails', label: 'Emails', icon: Mail },
+  { to: '/settings', label: 'Settings', icon: Settings },
 ] as const;
 
 export default function Layout() {

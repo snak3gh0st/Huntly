@@ -33,6 +33,13 @@ interface IdParams {
 /*  Plugin                                                             */
 /* ------------------------------------------------------------------ */
 
+function csvEscape(val: string): string {
+  if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+    return `"${val.replace(/"/g, '""')}"`;
+  }
+  return val;
+}
+
 export default async function campaignRoutes(app: FastifyInstance) {
   app.addHook('onRequest', apiKeyAuth);
 
@@ -272,6 +279,71 @@ export default async function campaignRoutes(app: FastifyInstance) {
       });
     },
   );
+
+  /* GET /campaigns/:id/export — CSV export of all leads */
+  app.get<{ Params: IdParams }>('/campaigns/:id/export', async (request, reply) => {
+    const leads = await prisma.lead.findMany({
+      where: { campaignId: request.params.id },
+      include: { enrichment: true, qualification: true, outreachEmails: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const header = 'Business Name,Email,Phone,Website,Region,Score,Status,Has WhatsApp,Has Chatbot,Has Booking,Pain Signals,Owner Name,Emails Sent,Last Email Status\n';
+
+    const rows = leads.map((l) => {
+      const q = l.qualification;
+      const e = l.enrichment;
+      const lastEmail = l.outreachEmails.sort((a, b) => b.sequenceNumber - a.sequenceNumber)[0];
+      const painSignals = Array.isArray(e?.painSignals)
+        ? (e.painSignals as Array<{ signal: string }>).map((p) => p.signal).join('; ')
+        : '';
+
+      return [
+        csvEscape(l.businessName),
+        l.email ?? '',
+        l.phone ?? '',
+        l.websiteUrl ?? '',
+        l.region ?? '',
+        q?.fitScore ?? '',
+        l.status,
+        e?.hasWhatsapp ?? '',
+        e?.hasChatbot ?? '',
+        e?.hasOnlineBooking ?? '',
+        csvEscape(painSignals),
+        csvEscape(e?.ownerName ?? ''),
+        l.outreachEmails.length,
+        lastEmail?.status ?? 'none',
+      ].join(',');
+    });
+
+    reply.header('Content-Type', 'text/csv');
+    reply.header('Content-Disposition', `attachment; filename="campaign-${request.params.id}-leads.csv"`);
+    return reply.send(header + rows.join('\n'));
+  });
+
+  /* POST /campaigns/:id/clone — duplicate a campaign (without leads) */
+  app.post<{ Params: IdParams }>('/campaigns/:id/clone', async (request, reply) => {
+    const source = await prisma.campaign.findUnique({
+      where: { id: request.params.id },
+    });
+
+    if (!source) {
+      return reply.status(404).send({ error: 'Campaign not found' });
+    }
+
+    const clone = await prisma.campaign.create({
+      data: {
+        name: `${source.name} (Copy)`,
+        vertical: source.vertical,
+        regions: source.regions,
+        dripConfig: source.dripConfig ?? {},
+        senderAddress: source.senderAddress,
+        emailTemplateSetId: source.emailTemplateSetId,
+      },
+    });
+
+    return reply.status(201).send(clone);
+  });
 
   /* DELETE /campaigns/:id — delete campaign + all its leads, enrichments, qualifications, emails */
   app.delete<{ Params: IdParams }>(

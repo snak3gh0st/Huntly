@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, X, Star, Eye, ChevronDown, ChevronUp, Globe, Phone, MessageCircle, Calendar, Bot, AlertTriangle, Play, ExternalLink, Pause, Trash2, MousePointerClick, Loader2 } from 'lucide-react';
-import { useCampaign, useLaunchCampaign, useStopCampaign, useDeleteCampaign } from '../hooks/useCampaigns';
+import { ArrowLeft, Send, X, Star, Eye, ChevronDown, ChevronUp, Globe, Phone, MessageCircle, Calendar, Bot, AlertTriangle, Play, ExternalLink, Pause, Trash2, MousePointerClick, Loader2, Download, Copy } from 'lucide-react';
+import { useCampaign, useLaunchCampaign, useStopCampaign, useDeleteCampaign, useCloneCampaign, exportCampaignCsv } from '../hooks/useCampaigns';
 import { useLeads, useApproveLead, useSkipLead, useConvertLead, useEmailPreview, useCampaignAnalytics, type LeadParams, type Lead } from '../hooks/useLeads';
 
 const PAGE_SIZE = 50;
@@ -28,6 +28,7 @@ export default function CampaignDetailPage() {
   const launchMutation = useLaunchCampaign();
   const stopMutation = useStopCampaign();
   const deleteMutation = useDeleteCampaign();
+  const cloneMutation = useCloneCampaign();
   const nav = useNavigate();
   const [filter, setFilter] = useState<LeadParams>({ status: 'qualified' });
 
@@ -118,6 +119,21 @@ export default function CampaignDetailPage() {
             <Play size={16} /> Resume
           </button>
         )}
+        <button
+          onClick={() => exportCampaignCsv(id!)}
+          className="flex items-center gap-2 border border-gray-700 text-gray-300 px-3 py-2 rounded-lg text-sm hover:bg-gray-800 transition-colors"
+          title="Download CSV"
+        >
+          <Download size={16} />
+        </button>
+        <button
+          onClick={() => cloneMutation.mutate(id!, { onSuccess: (data) => nav(`/campaigns/${data.id}`) })}
+          disabled={cloneMutation.isPending}
+          className="flex items-center gap-2 border border-gray-700 text-gray-300 px-3 py-2 rounded-lg text-sm hover:bg-gray-800 transition-colors disabled:opacity-50"
+          title="Clone campaign"
+        >
+          <Copy size={16} />
+        </button>
         <button
           onClick={() => { if (confirm(`Delete "${campaign.name}" and ALL its leads? This cannot be undone.`)) deleteMutation.mutate(id!, { onSuccess: () => nav('/campaigns') }); }}
           className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 text-red-400 px-3 py-2 rounded-lg text-sm hover:bg-red-500/20"
