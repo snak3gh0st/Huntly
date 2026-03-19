@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Rocket } from 'lucide-react';
-import { useCampaigns, useCreateCampaign, useLaunchCampaign } from '../hooks/useCampaigns';
+import { Plus, Rocket, Pause, Trash2, Play } from 'lucide-react';
+import { useCampaigns, useCreateCampaign, useLaunchCampaign, useStopCampaign, useDeleteCampaign } from '../hooks/useCampaigns';
 
 const statusColor: Record<string, string> = {
   active: 'bg-green-500/10 text-green-400 border-green-500/20',
@@ -14,6 +14,8 @@ export default function CampaignsPage() {
   const { data: campaigns, isLoading } = useCampaigns();
   const createMutation = useCreateCampaign();
   const launchMutation = useLaunchCampaign();
+  const stopMutation = useStopCampaign();
+  const deleteMutation = useDeleteCampaign();
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
   const [vertical, setVertical] = useState('');
@@ -138,6 +140,31 @@ export default function CampaignsPage() {
                     Launch
                   </button>
                 )}
+                {c.status === 'active' && (
+                  <button
+                    onClick={() => { if (confirm(`Stop campaign "${c.name}"? Pipeline will pause.`)) stopMutation.mutate(c.id); }}
+                    className="flex items-center gap-1.5 rounded-lg bg-yellow-500/10 border border-yellow-500/20 px-3 py-1.5 text-xs font-medium text-yellow-400 hover:bg-yellow-500/20 transition-colors"
+                  >
+                    <Pause size={14} />
+                    Stop
+                  </button>
+                )}
+                {c.status === 'paused' && (
+                  <button
+                    onClick={() => launchMutation.mutate(c.id)}
+                    className="flex items-center gap-1.5 rounded-lg bg-green-500/10 border border-green-500/20 px-3 py-1.5 text-xs font-medium text-green-400 hover:bg-green-500/20 transition-colors"
+                  >
+                    <Play size={14} />
+                    Resume
+                  </button>
+                )}
+                <button
+                  onClick={() => { if (confirm(`Delete campaign "${c.name}" and ALL its leads? This cannot be undone.`)) deleteMutation.mutate(c.id); }}
+                  className="flex items-center gap-1.5 rounded-lg bg-red-500/10 border border-red-500/20 px-2.5 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors"
+                  title="Delete campaign"
+                >
+                  <Trash2 size={14} />
+                </button>
               </div>
             </div>
           ))}

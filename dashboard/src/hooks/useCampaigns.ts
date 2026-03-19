@@ -50,3 +50,19 @@ export function useLaunchCampaign() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['campaigns'] }),
   });
 }
+
+export function useStopCampaign() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post(`/campaigns/${id}/stop`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['campaigns'] }),
+  });
+}
+
+export function useDeleteCampaign() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/campaigns/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['campaigns'] }),
+  });
+}

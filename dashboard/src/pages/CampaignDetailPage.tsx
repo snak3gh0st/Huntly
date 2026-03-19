@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Send, X, Star, Eye, ChevronDown, ChevronUp, Globe, Phone, MessageCircle, Calendar, Bot, AlertTriangle, Play, ExternalLink } from 'lucide-react';
-import { useCampaign, useLaunchCampaign } from '../hooks/useCampaigns';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Send, X, Star, Eye, ChevronDown, ChevronUp, Globe, Phone, MessageCircle, Calendar, Bot, AlertTriangle, Play, ExternalLink, Pause, Trash2 } from 'lucide-react';
+import { useCampaign, useLaunchCampaign, useStopCampaign, useDeleteCampaign } from '../hooks/useCampaigns';
 import { useLeads, useApproveLead, useSkipLead, useConvertLead, useEmailPreview, type LeadParams } from '../hooks/useLeads';
 
 const statusColor: Record<string, string> = {
@@ -23,6 +23,9 @@ export default function CampaignDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data: campaign } = useCampaign(id!);
   const launchMutation = useLaunchCampaign();
+  const stopMutation = useStopCampaign();
+  const deleteMutation = useDeleteCampaign();
+  const nav = useNavigate();
   const [filter, setFilter] = useState<LeadParams>({ status: 'qualified' });
   const { data: leads } = useLeads(id!, filter);
   const approveMut = useApproveLead();
@@ -60,6 +63,29 @@ export default function CampaignDetailPage() {
             <Play size={16} /> Launch
           </button>
         )}
+        {campaign.status === 'active' && (
+          <button
+            onClick={() => { if (confirm('Stop this campaign? Pipeline will pause.')) stopMutation.mutate(id!); }}
+            className="flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 px-4 py-2 rounded-lg text-sm font-medium hover:bg-yellow-500/20"
+          >
+            <Pause size={16} /> Stop
+          </button>
+        )}
+        {campaign.status === 'paused' && (
+          <button
+            onClick={() => launchMutation.mutate(id!)}
+            className="flex items-center gap-2 bg-green-500 text-black px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-400"
+          >
+            <Play size={16} /> Resume
+          </button>
+        )}
+        <button
+          onClick={() => { if (confirm(`Delete "${campaign.name}" and ALL its leads? This cannot be undone.`)) deleteMutation.mutate(id!, { onSuccess: () => nav('/campaigns') }); }}
+          className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 text-red-400 px-3 py-2 rounded-lg text-sm hover:bg-red-500/20"
+          title="Delete campaign"
+        >
+          <Trash2 size={16} />
+        </button>
       </div>
 
       {/* Funnel filter */}

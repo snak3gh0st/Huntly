@@ -141,4 +141,42 @@ export default async function campaignRoutes(app: FastifyInstance) {
       return reply.send({ status: 'launched', campaignId: campaign.id });
     },
   );
+
+  /* POST /campaigns/:id/stop — pause campaign */
+  app.post<{ Params: IdParams }>(
+    '/campaigns/:id/stop',
+    async (request, reply) => {
+      const campaign = await campaignRepo.findById(request.params.id);
+      if (!campaign) {
+        return reply.status(404).send({ error: 'Campaign not found' });
+      }
+
+      await campaignRepo.updateStatus(campaign.id, 'paused');
+      return reply.send({ status: 'paused', campaignId: campaign.id });
+    },
+  );
+
+  /* DELETE /campaigns/:id — delete campaign + all its leads, enrichments, qualifications, emails */
+  app.delete<{ Params: IdParams }>(
+    '/campaigns/:id',
+    async (request, reply) => {
+      const campaign = await campaignRepo.findById(request.params.id);
+      if (!campaign) {
+        return reply.status(404).send({ error: 'Campaign not found' });
+      }
+
+      // Delete in order: outreach emails → qualifications → enrichments → leads → campaign
+      await prisma.outreachEmail.deleteMany({ where: { campaignId: campaign.id } });
+      const leadIds = await prisma.lead.findMany({ where: { campaignId: campaign.id }, select: { id: true } });
+      const ids = leadIds.map(l => l.id);
+      if (ids.length > 0) {
+        await prisma.leadQualification.deleteMany({ where: { leadId: { in: ids } } });
+        await prisma.leadEnrichment.deleteMany({ where: { leadId: { in: ids } } });
+      }
+      await prisma.lead.deleteMany({ where: { campaignId: campaign.id } });
+      await prisma.campaign.delete({ where: { id: campaign.id } });
+
+      return reply.send({ status: 'deleted', campaignId: campaign.id });
+    },
+  );
 }
