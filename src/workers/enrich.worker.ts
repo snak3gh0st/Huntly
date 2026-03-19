@@ -88,6 +88,9 @@ export const enrichWorker = new Worker<EnrichJobData>(
     // Pick best email from crawl results
     const bestEmail = crawlResult ? pickBestEmail(crawlResult.emails) : null;
 
+    // Extract owner name from Google Maps source data (Outscraper owner_title field)
+    const ownerName = (lead.sourceData as any)?.owner_title ?? null;
+
     // Save enrichment data
     await enrichmentRepo.upsert(leadId, {
       hasWhatsapp: crawlResult?.hasWhatsapp ?? null,
@@ -101,6 +104,7 @@ export const enrichWorker = new Worker<EnrichJobData>(
       painSignals: reviewResult
         ? (reviewResult.analysis.painSignals as unknown as Prisma.InputJsonValue)
         : Prisma.DbNull,
+      ownerName,
     });
 
     // Set email on lead if found

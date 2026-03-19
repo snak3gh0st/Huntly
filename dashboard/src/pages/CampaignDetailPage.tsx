@@ -362,6 +362,9 @@ export default function CampaignDetailPage() {
                       <InfoBox label="Phone" value={lead.phone || 'Not found'} icon={<Phone size={12} />} />
                       <InfoBox label="Rating" value={lead.googleRating ? `${lead.googleRating}\u2605 (${lead.googleReviewCount} reviews)` : 'N/A'} />
                       <InfoBox label="Emails Found" value={enrichment?.emailsFound?.length ? enrichment.emailsFound.join(', ') : 'None'} />
+                      {enrichment?.ownerName && (
+                        <InfoBox label="Owner" value={enrichment.ownerName} />
+                      )}
                     </div>
 
                     {painSignals.length > 0 && (

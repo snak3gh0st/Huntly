@@ -210,6 +210,47 @@ export default async function campaignRoutes(app: FastifyInstance) {
       const replyRate = delivered > 0 ? Math.round((replied / delivered) * 1000) / 10 : 0;
       const conversionRate = delivered > 0 ? Math.round((converted / delivered) * 1000) / 10 : 0;
 
+      // A/B test breakdown
+      const abResults = await prisma.outreachEmail.groupBy({
+        by: ['variant', 'sequenceNumber'],
+        where: { campaignId, variant: { not: null } },
+        _count: { id: true },
+      });
+
+      const abOpens = await prisma.outreachEmail.groupBy({
+        by: ['variant', 'sequenceNumber'],
+        where: { campaignId, variant: { not: null }, status: { in: ['opened', 'clicked'] } },
+        _count: { id: true },
+      });
+
+      const abClicks = await prisma.outreachEmail.groupBy({
+        by: ['variant', 'sequenceNumber'],
+        where: { campaignId, variant: { not: null }, status: 'clicked' },
+        _count: { id: true },
+      });
+
+      // Build A/B test array
+      const abTest = abResults.map((row) => {
+        const sentCount = row._count.id;
+        const openRow = abOpens.find(
+          (o) => o.variant === row.variant && o.sequenceNumber === row.sequenceNumber,
+        );
+        const clickRow = abClicks.find(
+          (c) => c.variant === row.variant && c.sequenceNumber === row.sequenceNumber,
+        );
+        const openedCount = openRow?._count.id ?? 0;
+        const clickedCount = clickRow?._count.id ?? 0;
+        return {
+          variant: row.variant,
+          sequenceNumber: row.sequenceNumber,
+          sent: sentCount,
+          opened: openedCount,
+          clicked: clickedCount,
+          openRate: sentCount > 0 ? Math.round((openedCount / sentCount) * 1000) / 10 : 0,
+          clickRate: sentCount > 0 ? Math.round((clickedCount / sentCount) * 1000) / 10 : 0,
+        };
+      });
+
       return reply.send({
         total,
         sent,
@@ -227,6 +268,7 @@ export default async function campaignRoutes(app: FastifyInstance) {
           replyRate,
           conversionRate,
         },
+        abTest,
       });
     },
   );

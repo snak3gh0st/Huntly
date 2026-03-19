@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Mail, Eye, MousePointerClick, AlertTriangle, MessageSquare, BarChart3, TrendingUp, Send } from 'lucide-react';
-import { useStats, useCampaignAnalytics } from '../hooks/useLeads';
+import { Mail, Eye, MousePointerClick, AlertTriangle, MessageSquare, BarChart3, TrendingUp, Send, FlaskConical } from 'lucide-react';
+import { useStats, useCampaignAnalytics, type ABTestResult } from '../hooks/useLeads';
 import { useCampaigns } from '../hooks/useCampaigns';
 
 const funnelSteps = ['sent', 'delivered', 'opened', 'clicked', 'replied', 'converted'] as const;
@@ -132,6 +132,11 @@ export default function EmailsPage() {
             <MiniStat label="Replied" value={analytics.replied} />
             <MiniStat label="Converted" value={analytics.converted} />
           </div>
+
+          {/* A/B Test Results */}
+          {analytics.abTest && analytics.abTest.length > 0 && (
+            <ABTestSection abTest={analytics.abTest} />
+          )}
         </div>
       )}
     </div>
@@ -143,6 +148,81 @@ function MiniStat({ label, value }: { label: string; value: number }) {
     <div className="rounded-lg border border-gray-800 bg-gray-900 px-4 py-3">
       <p className="text-[10px] uppercase tracking-wider text-gray-500">{label}</p>
       <p className="text-xl font-semibold mt-0.5">{value}</p>
+    </div>
+  );
+}
+
+function ABTestSection({ abTest }: { abTest: ABTestResult[] }) {
+  // Group by sequenceNumber so we can find the winner per email
+  const sequences = [...new Set(abTest.map((r) => r.sequenceNumber))].sort();
+
+  return (
+    <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
+      <h3 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
+        <FlaskConical size={16} className="text-cyan-400" />
+        A/B Test Results
+      </h3>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-xs text-gray-500 uppercase tracking-wider">
+              <th className="text-left pb-3 pr-4">Email</th>
+              <th className="text-left pb-3 pr-4">Variant</th>
+              <th className="text-right pb-3 pr-4">Sent</th>
+              <th className="text-right pb-3 pr-4">Open Rate</th>
+              <th className="text-right pb-3 pr-4">Click Rate</th>
+              <th className="text-right pb-3">Winner</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sequences.map((seq) => {
+              const rows = abTest.filter((r) => r.sequenceNumber === seq);
+              const aRow = rows.find((r) => r.variant === 'A');
+              const bRow = rows.find((r) => r.variant === 'B');
+
+              // Determine winner by open rate, then click rate as tiebreaker
+              let winner: string | null = null;
+              if (aRow && bRow) {
+                if (aRow.openRate > bRow.openRate) winner = 'A';
+                else if (bRow.openRate > aRow.openRate) winner = 'B';
+                else if (aRow.clickRate > bRow.clickRate) winner = 'A';
+                else if (bRow.clickRate > aRow.clickRate) winner = 'B';
+              }
+
+              return rows.map((row) => {
+                const isWinner = winner === row.variant;
+                return (
+                  <tr
+                    key={`${seq}-${row.variant}`}
+                    className={`border-t border-gray-800 ${isWinner ? 'bg-green-500/5' : ''}`}
+                  >
+                    <td className="py-2.5 pr-4 text-gray-300">Email {row.sequenceNumber}</td>
+                    <td className="py-2.5 pr-4">
+                      <span className={`inline-flex items-center gap-1 ${isWinner ? 'text-green-400' : 'text-gray-400'}`}>
+                        {row.variant} {row.variant === 'A' ? '(original)' : '(alternative)'}
+                      </span>
+                    </td>
+                    <td className="py-2.5 pr-4 text-right text-gray-300">{row.sent}</td>
+                    <td className={`py-2.5 pr-4 text-right ${isWinner ? 'text-green-400 font-semibold' : 'text-gray-300'}`}>
+                      {row.openRate}%
+                    </td>
+                    <td className={`py-2.5 pr-4 text-right ${isWinner ? 'text-green-400 font-semibold' : 'text-gray-300'}`}>
+                      {row.clickRate}%
+                    </td>
+                    <td className="py-2.5 text-right">
+                      {isWinner && (
+                        <span className="text-xs font-semibold text-green-400 bg-green-500/10 px-2 py-1 rounded-md">
+                          Winner
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              });
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

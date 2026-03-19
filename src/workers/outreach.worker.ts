@@ -25,6 +25,12 @@ const SUBJECT_TEMPLATES: Record<number, (fields: MergeFields) => string> = {
   3: (f) => `Last chance: free demo for ${f.business_name}`,
 };
 
+const SUBJECT_VARIANTS: Record<number, (fields: MergeFields) => string> = {
+  1: (f) => `${f.business_name}, your customers are waiting for a reply`,
+  2: (f) => `What if ${f.business_name} never missed another message?`,
+  3: (f) => `Free for 7 days: AI assistant for ${f.business_name}`,
+};
+
 const LAST_SEQUENCE = DRIP_SEQUENCE[DRIP_SEQUENCE.length - 1]!.sequenceNumber;
 const DEMO_EXPIRY_DAYS = 60;
 
@@ -108,11 +114,27 @@ interface MergeFields extends Record<string, string> {
   unsubscribe_url: string;
   physical_address: string;
   count: string;
+  owner_greeting: string;
 }
 
 type FullLead = NonNullable<Awaited<ReturnType<typeof leadRepo.findById>>>;
 
-function buildMergeFields(lead: FullLead): MergeFields {
+function getOwnerGreeting(enrichment: FullLead['enrichment'], lang: string): string {
+  const name = enrichment?.ownerName;
+  const firstName = name?.split(' ')[0];
+
+  if (!firstName) {
+    if (lang === 'pt') return 'Olá,';
+    if (lang === 'ar') return '\u0645\u0631\u062D\u0628\u064B\u0627\u060C';
+    return 'Hi there,';
+  }
+
+  if (lang === 'pt') return `Olá ${firstName},`;
+  if (lang === 'ar') return `\u0645\u0631\u062D\u0628\u064B\u0627 ${firstName}\u060C`;
+  return `Hi ${firstName},`;
+}
+
+function buildMergeFields(lead: FullLead, lang: string): MergeFields {
   const painCount = Array.isArray(lead.enrichment?.painSignals)
     ? (lead.enrichment.painSignals as Array<{ count: number }>).reduce(
         (sum, p) => sum + (p.count ?? 0),
@@ -128,11 +150,13 @@ function buildMergeFields(lead: FullLead): MergeFields {
     unsubscribe_url: `${env.BASE_URL}/unsubscribe/${lead.unsubscribeToken}`,
     physical_address: lead.campaign?.senderAddress ?? env.PHYSICAL_ADDRESS,
     count: String(count),
+    owner_greeting: getOwnerGreeting(lead.enrichment, lang),
   };
 }
 
-function getSubject(sequenceNumber: number, fields: MergeFields): string {
-  const builder = SUBJECT_TEMPLATES[sequenceNumber];
+function getSubject(sequenceNumber: number, fields: MergeFields, variant: 'A' | 'B' = 'A'): string {
+  const templates = variant === 'B' ? SUBJECT_VARIANTS : SUBJECT_TEMPLATES;
+  const builder = templates[sequenceNumber];
   if (!builder) throw new Error(`Unknown sequence number: ${sequenceNumber}`);
   return builder(fields);
 }
@@ -290,9 +314,10 @@ export const outreachWorker = new Worker<SendDripJobData | Record<string, never>
     }
 
     // 4. Build merge fields + detect language from region
-    const mergeFields = buildMergeFields(lead);
-    const subject = getSubject(sequenceNumber, mergeFields);
     const lang = detectLanguage(lead.region ?? '');
+    const mergeFields = buildMergeFields(lead, lang);
+    const variant: 'A' | 'B' = Math.random() < 0.5 ? 'A' : 'B';
+    const subject = getSubject(sequenceNumber, mergeFields, variant);
     const templateName = getTemplateName(sequenceNumber, lang);
     const unsubscribeUrl = mergeFields.unsubscribe_url;
 
@@ -302,6 +327,7 @@ export const outreachWorker = new Worker<SendDripJobData | Record<string, never>
       campaign: { connect: { id: lead.campaignId } },
       sequenceNumber,
       subject,
+      variant,
       bodyHtml: '',
       status: 'scheduled',
       scheduledFor: new Date(),

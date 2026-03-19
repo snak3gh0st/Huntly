@@ -140,11 +140,15 @@ export default async function leadRoutes(app: FastifyInstance) {
       const topSignal = painSignals[0];
       const painCount = topSignal?.count ?? 0;
 
+      const ownerName = enrichment?.ownerName;
+      const firstName = ownerName?.split(' ')[0];
+
       const mergeFields: Record<string, string> = {
         business_name: lead.businessName,
         personalized_hook: qualification?.personalizedHook ?? '',
         demo_url: `${env.BASE_URL}/demo/${lead.demoToken}`,
         count: String(painCount),
+        owner_greeting: firstName ? `Hi ${firstName},` : 'Hi there,',
       };
 
       const unsubscribeUrl = `${env.BASE_URL}/unsubscribe/${lead.unsubscribeToken}`;

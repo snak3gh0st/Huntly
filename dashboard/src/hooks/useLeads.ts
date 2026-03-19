@@ -130,6 +130,16 @@ export function usePipeline() {
   });
 }
 
+export interface ABTestResult {
+  variant: string;
+  sequenceNumber: number;
+  sent: number;
+  opened: number;
+  clicked: number;
+  openRate: number;
+  clickRate: number;
+}
+
 export interface CampaignAnalytics {
   total: number;
   sent: number;
@@ -147,6 +157,7 @@ export interface CampaignAnalytics {
     replyRate: number;
     conversionRate: number;
   };
+  abTest?: ABTestResult[];
 }
 
 export function useCampaignAnalytics(campaignId: string | null) {

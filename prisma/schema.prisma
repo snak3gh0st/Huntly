@@ -96,6 +96,7 @@ model LeadEnrichment {
   websiteTechSignals     Json?    @map("website_tech_signals")
   reviewSentimentSummary String?  @map("review_sentiment_summary")
   painSignals            Json?    @map("pain_signals")
+  ownerName              String?  @map("owner_name")
   enrichedAt             DateTime @default(now()) @map("enriched_at")
 
   lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
@@ -124,6 +125,7 @@ model OutreachEmail {
   resendMessageId String?     @map("resend_message_id")
   subject         String
   bodyHtml        String      @map("body_html")
+  variant         String?     @map("variant") // "A" or "B" or null (no test)
   status          EmailStatus @default(scheduled)
   scheduledFor    DateTime    @map("scheduled_for")
   sentAt          DateTime?   @map("sent_at")
