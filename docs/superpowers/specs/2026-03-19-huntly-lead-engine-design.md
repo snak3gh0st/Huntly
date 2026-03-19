@@ -51,17 +51,22 @@ A **personalized demo page** per lead shows a simulated WhatsApp conversation ta
 
 ### Deployment (Cost-Optimized)
 
-Runs on the existing SigmaAI VPS (`ssh sigma` — root@46.225.111.73) as separate Docker containers. Shares Redis, has its own database. Demo pages served at `huntly.sigmaintel.io/demo/:id`.
+Runs on the existing SigmaAI VPS (`ssh sigma` — root@46.225.111.73) as separate Docker containers. Shares Redis, has its own database. Demo pages served at `outreach.sigmaintel.io/demo/:token`.
+
+**Domain strategy:** Use `outreach.sigmaintel.io` for everything (sending emails + demo pages). Same root domain avoids SPF/DKIM alignment issues and does not require purchasing a new domain.
 
 **Monthly cost at ~100 leads/week:**
 
 | Service | Cost |
 |---------|------|
-| Outscraper | ~$1-2/mo (400 results) |
-| Groq AI | $0 (free tier: 14.4K req/day) |
+| Outscraper (place search) | ~$1-2/mo (400 results) |
+| Outscraper (reviews) | ~$8-10/mo (20 reviews × 400 leads = 8K reviews) |
+| Groq AI | $0 (free tier: 14.4K req/day, 131K TPM) |
 | Resend | $0 (free tier: 3K emails/mo) |
 | Hosting | $0 (existing VPS) |
-| **Total** | **~$1-2/mo** |
+| **Total** | **~$10-12/mo** |
+
+**Note:** Outscraper `google_maps_reviews` is a separate endpoint from `google_maps_search`. Reviews cost ~$1/1000 reviews. We fetch 20 reviews per lead (not 50) to keep costs down while still capturing pain signals.
 
 ## Data Model
 
@@ -98,7 +103,13 @@ Runs on the existing SigmaAI VPS (`ssh sigma` — root@46.225.111.73) as separat
 | google_review_count | int | |
 | source_data | json | Raw Outscraper response |
 | status | enum | sourced → enriched → qualified → contacted → replied → converted → unsubscribed |
+| has_replied | boolean | True when any reply detected (lead-level, not per-email) |
+| demo_token | string | Cryptographically random token for demo page URL (`crypto.randomBytes(16).toString('hex')`) |
+| demo_expires_at | timestamp | Demo page expiry (60 days after last email sent) |
+| unsubscribe_token | string | Unique random token for unsubscribe URL |
+| last_error | text | Last pipeline error (for debugging stuck leads) |
 | created_at | timestamp | |
+| updated_at | timestamp | |
 
 ### lead_enrichment
 
@@ -135,12 +146,15 @@ Runs on the existing SigmaAI VPS (`ssh sigma` — root@46.225.111.73) as separat
 | resend_message_id | string | Resend tracking ID |
 | subject | string | |
 | body_html | text | |
-| status | enum | scheduled → sent → opened → clicked → replied → bounced |
+| campaign_id | uuid | FK to campaigns (denormalized for cross-campaign queries) |
+| status | enum | scheduled → sending → delivered → opened → clicked → bounced → failed → complained |
 | scheduled_for | timestamp | |
 | sent_at | timestamp | |
+| delivered_at | timestamp | |
 | opened_at | timestamp | |
 | clicked_at | timestamp | |
 | created_at | timestamp | |
+| updated_at | timestamp | |
 
 ### email_template_sets
 
@@ -150,6 +164,29 @@ Runs on the existing SigmaAI VPS (`ssh sigma` — root@46.225.111.73) as separat
 | name | string | Template set name |
 | vertical | string | Target vertical |
 | templates | json[] | `[{ sequence_number, subject_template, body_template }]` |
+
+### email_templates (separate table for future A/B testing)
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid | Primary key |
+| template_set_id | uuid | FK to email_template_sets |
+| sequence_number | int | 1, 2, or 3 |
+| subject_template | string | Subject with merge fields |
+| body_template | text | HTML body with merge fields |
+| created_at | timestamp | |
+
+### excluded_clients
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid | Primary key |
+| phone | string | Phone number to exclude |
+| domain | string | Website domain to exclude |
+| reason | string | e.g., "existing_client", "competitor" |
+| created_at | timestamp | |
+
+Populated via periodic script that reads from `sigmaai_db.tenants`. Used during qualification to disqualify existing SigmaAI clients.
 
 ## Pipeline Details
 
@@ -173,8 +210,9 @@ Two parallel passes per lead:
 - Timeout: 15 seconds per site, graceful failure
 
 **Pass 2 — Review Analysis (AI):**
-- Input: last 50 Google reviews from Outscraper data
-- Single Groq API call (Llama 3.3 70B)
+- Input: last 20 Google reviews (fetched via separate Outscraper `google_maps_reviews` endpoint)
+- Single Groq API call (Llama 3.3 70B), max 6 concurrent calls/min (TPM limit: 131K tokens)
+- Fallback: on Groq 429, retry once after 10s, then fall back to GPT-4o-mini
 - Structured JSON output: sentiment_summary, pain_signals[{signal, count, example}], positive_themes
 - Pain signal categories: slow_response, hard_to_reach, hard_to_book, no_after_hours, no_online_booking, rude_staff, long_wait
 
@@ -193,9 +231,11 @@ Single AI call per lead that produces:
 - Score >= 70: Auto-approved for outreach
 - Score 40-69: Queued for manual review
 - Score < 40: Auto-skipped
-- Disqualified: No email found, competitor, already a SigmaAI client
+- Disqualified: No email found, competitor, already a SigmaAI client (checked against `excluded_clients` table)
 
 **Output:** Lead status → `qualified`
+
+**Status transition to `converted`:** When a lead signs up for SigmaAI via the demo page CTA (tracked via UTM `ref=huntly&lead={id}`), a webhook or periodic sync marks them as `converted`. For MVP, this is done manually.
 
 ### Stage 4: Outreach (Resend Drip Engine)
 
@@ -216,33 +256,81 @@ Single AI call per lead that produces:
 - Body: Zero-friction offer, reply-is-the-CTA
 - CTA: "Reply with your WhatsApp number"
 
-**Demo page** at `huntly.sigmaintel.io/demo/:leadId`:
+**Demo page** at `outreach.sigmaintel.io/demo/:token`:
+- Uses opaque `demo_token` (not lead UUID) — no PII in URL
+- Expires after `demo_expires_at` (60 days after last email), returns 404 after expiry
 - Business name + simulated WhatsApp conversation from demo_scenario
+- Disclaimer at bottom: "This is a simulated example of how an AI assistant could work for your business"
 - CTA button → SigmaAI signup with UTM params: `appai.sigmaintel.io/signup?ref=huntly&lead={id}&vertical={vertical}`
 
 **Stop conditions:**
 - Lead clicks demo → pause drip
-- Lead replies → pause drip + flag for manual follow-up
+- Lead replies → pause drip + set `has_replied = true` + flag for manual follow-up
 - Lead bounces → mark invalid
-- Lead unsubscribes → mark permanently
+- Lead unsubscribes → mark permanently, terminal state (no future emails ever)
+
+**Unsubscribe flow:**
+- Every email includes `List-Unsubscribe` and `List-Unsubscribe-Post` headers (RFC 8058)
+- Unsubscribe URL: `outreach.sigmaintel.io/unsubscribe/:unsubscribe_token`
+- GET renders confirmation page, POST processes immediately (GDPR: instant, CAN-SPAM: < 10 days)
+- Unsubscribed leads can never re-enter any campaign
+
+**Compliance:**
+- Every email includes a physical mailing address in the footer (configured in `campaigns.sender_address` or global config)
+- One-click unsubscribe header on every email
+- CAN-SPAM + GDPR compliant
 
 **Sending discipline:**
-- Send from subdomain: `outreach.huntly.io`
+- Send from subdomain: `outreach.sigmaintel.io`
 - Warm-up: 20 emails/day, ramp 20% daily over 2 weeks
 - Daily cap: configurable, defaults to 50
-- One-click unsubscribe header (CAN-SPAM / GDPR compliant)
 - Resend handles SPF, DKIM, DMARC
 
 ### Webhook Tracking
 
 Resend webhooks update `outreach_emails` in real-time:
-- `email.delivered` → status = sent
+- `email.sent` → status = sending
+- `email.delivered` → status = delivered, record delivered_at
 - `email.opened` → status = opened, record opened_at
 - `email.clicked` → status = clicked, record clicked_at, pause drip
 - `email.bounced` → status = bounced, mark lead invalid
-- `email.complained` → mark lead unsubscribed
+- `email.complained` → status = complained, mark lead unsubscribed
+- Resend 4xx rejection → status = failed
 
-Warm reply detection: inbound webhook or monitored reply-to address. Any reply triggers notification (configurable: Slack, WhatsApp, email).
+**Reply detection:** Use Resend inbound routing — configure a reply-to address on `outreach.sigmaintel.io` that forwards to a webhook. Replies set `lead.has_replied = true`, pause the drip, and trigger a notification (configurable: Slack, WhatsApp, email). Reply detection is a **lead-level event**, not an email status.
+
+## Failure Handling
+
+Each pipeline stage has explicit retry and fallback behavior. All failures are recorded in `leads.last_error`.
+
+| Stage | Failure | Retry | Fallback |
+|-------|---------|-------|----------|
+| Source | Outscraper API down | 3x exponential backoff (5s, 15s, 45s) | Dead-letter queue, alert |
+| Source | Duplicate query | BullMQ job ID dedup | Skip (idempotent) |
+| Enrich/Playwright | Site timeout (15s) | No retry | Mark signals as `null` (unknown), continue pipeline |
+| Enrich/Playwright | Site blocks crawler | No retry | Mark signals as `null`, continue |
+| Enrich/AI (Groq) | 429 rate limit | 1x after 10s | Fall back to GPT-4o-mini |
+| Enrich/AI | Malformed JSON response | 1x retry with stricter prompt | Skip review analysis, proceed with website-only data |
+| Qualify | AI call fails | 2x retry | Leave in `enriched` status for manual review |
+| Outreach | Resend rejects (4xx) | No retry | Mark email `failed`, continue drip with next email |
+| Outreach | Resend rate limit (429) | 3x with 5-min backoff | Delay remaining sends |
+| Webhook | Webhook processing fails | BullMQ auto-retry (3x) | Dead-letter, manual reconciliation |
+
+**Worker concurrency limits:**
+- Source worker: 2 concurrent jobs (Outscraper rate limits)
+- Enrich worker: 5 concurrent Playwright instances (memory: ~300MB each, cap at 1.5GB)
+- Enrich/Qualify AI: max 6 Groq calls/min (TPM constraint), no limit for GPT-4o-mini fallback
+- Outreach worker: 1 concurrent job (respect daily sending cap)
+
+**Playwright resource note:** Use `cheerio` for simple HTML parsing (email extraction, link detection) on most sites. Only invoke Playwright for JavaScript-rendered sites (SPA detection: if cheerio finds no content in `<body>`, retry with Playwright). This reduces memory usage from ~1.5GB to ~300MB for typical batches.
+
+## Auth & Security
+
+- All admin API routes protected by API key (stored in `.env`, checked via Fastify `onRequest` hook)
+- Demo pages are public but use opaque tokens (not UUIDs) and expire
+- Unsubscribe pages are public but use unique tokens per lead
+- No PII in URLs — tokens only
+- `.env` contains: Outscraper API key, Groq API key, OpenAI API key, Resend API key, DB connection string, admin API key
 
 ## Project Structure
 
@@ -271,12 +359,15 @@ Huntly/
 │   │   ├── qualifier.service.ts  # Lead scoring + content gen
 │   │   ├── email.service.ts      # Resend SDK wrapper
 │   │   └── demo-page.service.ts  # Demo page rendering
+│   ├── middleware/
+│   │   └── api-key-auth.ts       # Admin API key verification
 │   ├── routes/
-│   │   ├── campaign.routes.ts    # CRUD campaigns
-│   │   ├── lead.routes.ts        # Browse/approve/reject leads
-│   │   ├── outreach.routes.ts    # Email status, manual actions
-│   │   ├── demo.routes.ts        # GET /demo/:leadId
-│   │   └── webhook.routes.ts     # Resend webhooks
+│   │   ├── campaign.routes.ts    # CRUD campaigns (auth required)
+│   │   ├── lead.routes.ts        # Browse/approve/reject leads (auth required)
+│   │   ├── outreach.routes.ts    # Email status, manual actions (auth required)
+│   │   ├── demo.routes.ts        # GET /demo/:token (public, token-gated)
+│   │   ├── unsubscribe.routes.ts # GET+POST /unsubscribe/:token (public)
+│   │   └── webhook.routes.ts     # Resend webhooks (signature verified)
 │   └── templates/
 │       ├── emails/               # HTML email templates
 │       └── demo/                 # Demo page HTML template
@@ -292,7 +383,7 @@ Huntly/
 3. Drip sequence respects stop conditions (click/reply/bounce/unsubscribe)
 4. Resend webhooks update email status in real-time
 5. Full funnel visible: sourced → enriched → qualified → contacted → opened → clicked → replied → converted
-6. Cost stays under $5/mo at 100 leads/week
+6. Cost stays under $15/mo at 100 leads/week
 
 ## Future (Not MVP)
 
