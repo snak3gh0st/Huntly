@@ -352,7 +352,8 @@ export async function sendDripDirect(
 export const outreachWorker = new Worker<SendDripJobData | Record<string, never>>(
   'outreach',
   async (job) => {
-    if (!env.EMAIL_ENABLED) {
+    const { runtimeConfig } = await import('../lib/ai-config.js');
+    if (!runtimeConfig.emailEnabled) {
       console.log(`[outreach] Email disabled, skipping job ${job.name}`);
       return;
     }

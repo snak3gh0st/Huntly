@@ -57,9 +57,18 @@ export default function CampaignsPage() {
           onSubmit={handleCreate}
           className="rounded-xl border border-gray-800 bg-gray-900 p-5 space-y-4"
         >
+          {/* How it works */}
+          <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 px-4 py-3">
+            <p className="text-xs text-cyan-300 font-medium mb-1">How search works</p>
+            <p className="text-xs text-gray-400">
+              Huntly searches Google Maps using: <code className="text-cyan-400 bg-gray-800 px-1.5 py-0.5 rounded">"{vertical} in {regions.split(',')[0]?.trim() || 'region'}"</code>
+              {' '}— so write the vertical exactly as you'd type it into Google Maps.
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Name</label>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Campaign Name</label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -67,9 +76,10 @@ export default function CampaignsPage() {
                 className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:border-cyan-500 focus:outline-none"
                 required
               />
+              <p className="text-[10px] text-gray-500 mt-1">Internal label — only you see this</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Vertical</label>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Business Type</label>
               <input
                 value={vertical}
                 onChange={(e) => setVertical(e.target.value)}
@@ -77,10 +87,12 @@ export default function CampaignsPage() {
                 className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:border-cyan-500 focus:outline-none"
                 required
               />
-              <p className="text-[10px] text-gray-500 mt-1">Use Google Maps search terms: "dental clinic", "law firm", "real estate agent", "hair salon", "veterinary clinic"</p>
+              <p className="text-[10px] text-gray-500 mt-1">
+                Type it like a Google Maps search. Examples: <span className="text-gray-400">dental clinic</span>, <span className="text-gray-400">hair salon</span>, <span className="text-gray-400">real estate agent</span>, <span className="text-gray-400">restaurant</span>, <span className="text-gray-400">law firm</span>
+              </p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Regions (comma-separated)</label>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Regions</label>
               <input
                 value={regions}
                 onChange={(e) => setRegions(e.target.value)}
@@ -88,9 +100,25 @@ export default function CampaignsPage() {
                 className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:border-cyan-500 focus:outline-none"
                 required
               />
-              <p className="text-[10px] text-gray-500 mt-1">Use "City Country" format for best results: "Miami US", "London UK", "Dubai UAE", "São Paulo Brazil"</p>
+              <p className="text-[10px] text-gray-500 mt-1">
+                Comma-separated. Use <span className="text-gray-400">City Country</span> format: <span className="text-gray-400">Miami US</span>, <span className="text-gray-400">London UK</span>, <span className="text-gray-400">Dubai UAE</span>
+              </p>
             </div>
           </div>
+
+          {/* Live preview */}
+          {vertical && regions && (
+            <div className="rounded-lg bg-gray-800 px-4 py-3">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Search preview</p>
+              <div className="flex flex-wrap gap-2">
+                {regions.split(',').map((r) => r.trim()).filter(Boolean).map((r, i) => (
+                  <code key={i} className="text-xs text-gray-300 bg-gray-700 px-2 py-1 rounded">
+                    {vertical} in {r}
+                  </code>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="flex gap-3">
             <button
               type="submit"

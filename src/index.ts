@@ -1,7 +1,13 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import fastifyStatic from '@fastify/static';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { existsSync } from 'node:fs';
 import { env } from './config.js';
-import { aiConfig } from './lib/ai-config.js';
+import { runtimeConfig } from './lib/ai-config.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Import routes (default exports)
 import demoRoutes from './routes/demo.routes.js';
@@ -23,15 +29,15 @@ await app.register(cors);
 
 // Public config endpoint (tells dashboard what features are enabled)
 app.get('/api/config', async () => ({
-  emailEnabled: env.EMAIL_ENABLED,
-  aiProvider: aiConfig.provider,
-  ollamaModel: aiConfig.provider === 'ollama' ? aiConfig.ollamaModel : undefined,
+  emailEnabled: runtimeConfig.emailEnabled,
+  aiProvider: runtimeConfig.aiProvider,
+  ollamaModel: runtimeConfig.aiProvider === 'ollama' ? runtimeConfig.ollamaModel : undefined,
 }));
 
 // AI provider management
 app.get('/api/ai/models', async (_req, reply) => {
   try {
-    const res = await fetch(`${aiConfig.ollamaUrl}/api/tags`);
+    const res = await fetch(`${runtimeConfig.ollamaUrl}/api/tags`);
     if (!res.ok) throw new Error('Ollama not reachable');
     const data = await res.json() as { models: Array<{ name: string; size: number; modified_at: string }> };
     const models = data.models.map(m => ({
@@ -52,10 +58,20 @@ app.post<{ Body: { provider: string; ollamaModel?: string } }>(
     if (!['ollama', 'groq', 'openai'].includes(provider)) {
       return reply.status(400).send({ error: 'Invalid provider' });
     }
-    aiConfig.provider = provider as 'ollama' | 'groq' | 'openai';
-    if (ollamaModel) aiConfig.ollamaModel = ollamaModel;
+    runtimeConfig.aiProvider = provider as 'ollama' | 'groq' | 'openai';
+    if (ollamaModel) runtimeConfig.ollamaModel = ollamaModel;
     console.log(`[ai] Provider switched to ${provider}${ollamaModel ? ` (${ollamaModel})` : ''}`);
-    return reply.send({ provider: aiConfig.provider, ollamaModel: aiConfig.ollamaModel });
+    return reply.send({ provider: runtimeConfig.aiProvider, ollamaModel: runtimeConfig.ollamaModel });
+  },
+);
+
+// Email toggle
+app.post<{ Body: { enabled: boolean } }>(
+  '/api/config/email',
+  async (req, reply) => {
+    runtimeConfig.emailEnabled = req.body.enabled;
+    console.log(`[config] Email ${runtimeConfig.emailEnabled ? 'enabled' : 'disabled'}`);
+    return reply.send({ emailEnabled: runtimeConfig.emailEnabled });
   },
 );
 
@@ -68,6 +84,21 @@ await app.register(webhookRoutes, { prefix: '/webhooks' });
 await app.register(campaignRoutes, { prefix: '/api' });
 await app.register(leadRoutes, { prefix: '/api' });
 await app.register(outreachRoutes, { prefix: '/api' });
+
+// Serve dashboard (static build) — only if the build exists
+const dashboardPath = resolve(__dirname, 'dashboard');
+if (existsSync(dashboardPath)) {
+  await app.register(fastifyStatic, {
+    root: dashboardPath,
+    prefix: '/',
+    wildcard: false,
+  });
+
+  // SPA fallback — serve index.html for any non-API, non-file route
+  app.setNotFoundHandler(async (_req, reply) => {
+    return reply.sendFile('index.html', dashboardPath);
+  });
+}
 
 // Graceful shutdown
 const shutdown = async () => {

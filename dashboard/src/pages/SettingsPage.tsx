@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Trash2, Plus, Shield, Key, Eye, EyeOff, Brain, Cpu, Cloud, Zap, Check } from 'lucide-react';
+import { Trash2, Plus, Shield, Key, Eye, EyeOff, Brain, Cpu, Cloud, Zap, Check, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../lib/api';
-import { useAppConfig, useAiModels, useSetAiProvider } from '../hooks/useLeads';
+import { useAppConfig, useAiModels, useSetAiProvider, useToggleEmail } from '../hooks/useLeads';
 
 interface ExcludedClient {
   id: string;
@@ -51,6 +51,7 @@ export default function SettingsPage() {
   const { data: appConfig } = useAppConfig();
   const { data: aiModels } = useAiModels();
   const setProviderMut = useSetAiProvider();
+  const toggleEmailMut = useToggleEmail();
 
   const [type, setType] = useState<'domain' | 'phone'>('domain');
   const [value, setValue] = useState('');
@@ -213,6 +214,42 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
+      </section>
+
+      {/* Email Outreach Toggle */}
+      <section className="rounded-xl border border-gray-800 bg-gray-900 p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Mail size={18} className="text-amber-400" />
+            <h2 className="text-lg font-semibold">Email Outreach</h2>
+          </div>
+          <button
+            onClick={() => {
+              const next = !appConfig?.emailEnabled;
+              toast.promise(
+                toggleEmailMut.mutateAsync(next),
+                {
+                  loading: next ? 'Enabling email...' : 'Disabling email...',
+                  success: next ? 'Email outreach enabled' : 'Email outreach disabled',
+                  error: 'Failed to toggle',
+                },
+              );
+            }}
+            disabled={toggleEmailMut.isPending}
+            className={`relative w-12 h-7 rounded-full transition-colors ${
+              appConfig?.emailEnabled ? 'bg-green-500' : 'bg-gray-600'
+            } disabled:opacity-50`}
+          >
+            <div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-transform ${
+              appConfig?.emailEnabled ? 'translate-x-6' : 'translate-x-1'
+            }`} />
+          </button>
+        </div>
+        <p className="text-sm text-gray-400">
+          {appConfig?.emailEnabled
+            ? 'Email sending is active. Approved leads will receive outreach emails.'
+            : 'Email sending is off. The pipeline will scrape and qualify leads, but no emails will be sent.'}
+        </p>
       </section>
 
       {/* Blacklist */}

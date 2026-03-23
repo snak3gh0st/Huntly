@@ -20,6 +20,8 @@ export const sourceWorker = new Worker<SourceJobData>(
     const campaign = await campaignRepo.findById(job.data.campaignId);
     if (!campaign || campaign.status !== 'active') return;
 
+    let totalFound = 0;
+
     for (const region of campaign.regions) {
       const query = `${campaign.vertical} in ${region}`;
 
@@ -27,9 +29,16 @@ export const sourceWorker = new Worker<SourceJobData>(
       try {
         results = await searchBusinesses(query);
       } catch (err) {
-        console.error(`[source] Failed to search "${query}":`, err);
-        continue; // Skip this region, try next
+        console.error(`[source] Failed to search "${query}":`, (err as Error).message);
+        continue;
       }
+
+      if (results.length === 0) {
+        console.warn(`[source] 0 results for "${query}" — try a different business type or region`);
+        continue;
+      }
+
+      console.log(`[source] Found ${results.length} businesses for "${query}"`);
 
       for (const result of results) {
         // Dedup check
@@ -52,14 +61,17 @@ export const sourceWorker = new Worker<SourceJobData>(
             sourceData: result.raw as Prisma.InputJsonValue,
           });
 
+          totalFound++;
           await enrichQueue.add('enrich-lead', { leadId: lead.id }, {
             jobId: `enrich-${lead.id}`, // idempotent
           });
         } catch (err) {
-          console.error(`[source] Failed to create lead for ${result.businessName}:`, err);
+          console.error(`[source] Failed to create lead for ${result.businessName}:`, (err as Error).message);
         }
       }
     }
+
+    console.log(`[source] Campaign "${campaign.name}" finished: ${totalFound} new leads sourced`);
   },
   {
     connection,

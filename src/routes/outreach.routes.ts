@@ -131,13 +131,7 @@ export default async function outreachRoutes(app: FastifyInstance) {
       FROM lead_qualifications lq
       JOIN leads l ON l.id = lq.lead_id
       GROUP BY 1
-      ORDER BY
-        CASE
-          WHEN lq.fit_score >= 80 THEN 1
-          WHEN lq.fit_score >= 70 THEN 2
-          WHEN lq.fit_score >= 40 THEN 3
-          ELSE 4
-        END
+      ORDER BY min(lq.fit_score) DESC
     `);
 
     const ranges = rows.map((r) => {

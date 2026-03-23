@@ -119,8 +119,9 @@ export default async function leadRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: 'Lead has no email address' });
       }
 
-      if (!env.EMAIL_ENABLED) {
-        return reply.status(403).send({ error: 'Email sending is disabled. Set EMAIL_ENABLED=true to enable.' });
+      const { runtimeConfig } = await import('../lib/ai-config.js');
+      if (!runtimeConfig.emailEnabled) {
+        return reply.status(403).send({ error: 'Email sending is disabled. Enable it in Settings.' });
       }
 
       const sendNow = request.query.sendNow === 'true';

@@ -105,6 +105,17 @@ export function useSetAiProvider() {
   });
 }
 
+export function useToggleEmail() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) =>
+      api.post('/config/email', { enabled }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['app-config'] });
+    },
+  });
+}
+
 export function useLeads(campaignId: string, params?: LeadParams) {
   return useQuery({
     queryKey: ['leads', campaignId, params],

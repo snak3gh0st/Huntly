@@ -59,6 +59,12 @@ export async function searchBusinesses(
     false,   // asyncRequest — MUST be false for synchronous response
   );
 
+  // Outscraper may return null, undefined, empty object, or non-iterable on no results
+  if (!results || !Array.isArray(results) || results.length === 0) {
+    console.warn(`[outscraper] No results for "${query}" — try a simpler business type`);
+    return [];
+  }
+
   const seen = new Set<string>();
   const leads: LeadSourceData[] = [];
 

@@ -1,7 +1,7 @@
 import Groq from 'groq-sdk';
 import OpenAI from 'openai';
 import { env } from '../config.js';
-import { aiConfig } from './ai-config.js';
+import { runtimeConfig } from './ai-config.js';
 
 /* ------------------------------------------------------------------ */
 /*  Provider clients (lazy — only created when needed)                 */
@@ -29,8 +29,8 @@ function openai(): OpenAI {
 let _ollama: OpenAI | null = null;
 let _ollamaUrl = '';
 function ollama(): OpenAI {
-  if (!_ollama || _ollamaUrl !== aiConfig.ollamaUrl) {
-    _ollamaUrl = aiConfig.ollamaUrl;
+  if (!_ollama || _ollamaUrl !== runtimeConfig.ollamaUrl) {
+    _ollamaUrl = runtimeConfig.ollamaUrl;
     _ollama = new OpenAI({
       baseURL: `${_ollamaUrl}/v1`,
       apiKey: 'ollama',
@@ -62,7 +62,7 @@ async function callOllama(opts: AiCallOptions): Promise<string> {
   ];
 
   const res = await ollama().chat.completions.create({
-    model: aiConfig.ollamaModel,
+    model: runtimeConfig.ollamaModel,
     messages,
     temperature: 0.3,
     ...(opts.json ? { response_format: { type: 'json_object' as const } } : {}),
@@ -127,10 +127,10 @@ const FALLBACK_CHAIN: Record<Provider, Provider[]> = {
 
 /**
  * Call AI with automatic fallback.
- * Reads provider from aiConfig (mutable at runtime via dashboard).
+ * Reads provider from runtimeConfig (mutable at runtime via dashboard).
  */
 export async function callAI(opts: AiCallOptions): Promise<string> {
-  const chain = FALLBACK_CHAIN[aiConfig.provider];
+  const chain = FALLBACK_CHAIN[runtimeConfig.aiProvider];
 
   for (let i = 0; i < chain.length; i++) {
     const provider = chain[i]!;
