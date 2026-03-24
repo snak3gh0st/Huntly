@@ -31,7 +31,7 @@ Each lead gets a **personalized demo page** showing a simulated WhatsApp convers
 | HTTP | Fastify 5 |
 | Jobs | BullMQ + Redis 7 |
 | Database | PostgreSQL 16 + Prisma ORM |
-| Web Crawling | Playwright + Cheerio |
+| Web Crawling | Cheerio (HTML parsing) |
 | AI | Ollama (local) / Groq (fast cloud) / OpenAI (fallback) |
 | Email | Resend |
 | Lead Sourcing | Apify (Google Maps Scraper) |
@@ -73,9 +73,6 @@ cp .env.example .env
 
 # Database
 npx prisma migrate dev --name init
-
-# Install Playwright browser
-npx playwright install chromium
 
 # Seed sample campaign + email templates
 npm run seed

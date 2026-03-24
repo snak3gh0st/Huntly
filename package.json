@@ -29,7 +29,7 @@
     "openai": "^6.32.0",
     "outscraper": "^2.2.2",
     "pg": "^8.20.0",
-    "playwright": "^1.58.2",
+
     "resend": "^6.9.4"
   },
   "devDependencies": {
