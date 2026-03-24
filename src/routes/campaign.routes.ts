@@ -13,6 +13,7 @@ interface CreateBody {
   name: string;
   vertical: string;
   regions: string[];
+  maxLeadsPerRegion?: number;
   dripConfig?: Record<string, unknown>;
   senderAddress?: string;
 }
@@ -45,12 +46,13 @@ export default async function campaignRoutes(app: FastifyInstance) {
 
   /* POST /campaigns — create */
   app.post<{ Body: CreateBody }>('/campaigns', async (request, reply) => {
-    const { name, vertical, regions, dripConfig, senderAddress } = request.body;
+    const { name, vertical, regions, maxLeadsPerRegion, dripConfig, senderAddress } = request.body;
 
     const campaign = await campaignRepo.create({
       name,
       vertical,
       regions,
+      maxLeadsPerRegion: maxLeadsPerRegion ?? 50,
       dripConfig: (dripConfig ?? {}) as Prisma.InputJsonValue,
       senderAddress,
     });

@@ -24,6 +24,7 @@ export const qualifyWorker = new Worker<QualifyJobData>(
     const enrichment = lead.enrichment;
 
     // Build qualification input from lead + enrichment
+    const contacts = (lead.sourceData as any)?._contacts ?? {};
     const input: QualificationInput = {
       businessName: lead.businessName,
       category: lead.category ?? '',
@@ -36,6 +37,11 @@ export const qualifyWorker = new Worker<QualifyJobData>(
       hasWhatsapp: enrichment?.hasWhatsapp ?? null,
       hasChatbot: enrichment?.hasChatbot ?? null,
       hasOnlineBooking: enrichment?.hasOnlineBooking ?? null,
+      hasWhatsappFromSource: Array.isArray(contacts.whatsapps) && contacts.whatsapps.length > 0,
+      hasInstagram: Array.isArray(contacts.instagrams) && contacts.instagrams.length > 0,
+      hasFacebook: Array.isArray(contacts.facebooks) && contacts.facebooks.length > 0,
+      hasLinkedIn: Array.isArray(contacts.linkedIns) && contacts.linkedIns.length > 0,
+      emailFoundAtSource: Boolean(lead.email),
       painSignals: Array.isArray(enrichment?.painSignals)
         ? (enrichment.painSignals as Array<{ signal: string; count: number; example: string }>)
         : [],

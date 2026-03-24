@@ -37,7 +37,7 @@ export function useCampaign(id: string) {
 export function useCreateCampaign() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { name: string; vertical: string; regions: string[] }) =>
+    mutationFn: (data: { name: string; vertical: string; regions: string[]; maxLeadsPerRegion?: number }) =>
       api.post<Campaign>('/campaigns', data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['campaigns'] }),
   });

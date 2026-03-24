@@ -12,6 +12,7 @@ export const leadRepo = {
     country?: string;
     phone?: string;
     websiteUrl?: string;
+    email?: string;
     googleMapsPlaceId?: string;
     googleRating?: number;
     googleReviewCount?: number;

@@ -18,6 +18,11 @@ export interface QualificationInput {
   hasWhatsapp: boolean | null;
   hasChatbot: boolean | null;
   hasOnlineBooking: boolean | null;
+  hasWhatsappFromSource?: boolean;
+  hasInstagram?: boolean;
+  hasFacebook?: boolean;
+  hasLinkedIn?: boolean;
+  emailFoundAtSource?: boolean;
   painSignals: Array<{ signal: string; count: number; example: string }>;
   reviewSentimentSummary: string;
   /** ISO language code detected from region (en, pt, ar). Defaults to en. */
@@ -89,7 +94,12 @@ function buildUserPrompt(input: QualificationInput): string {
 Category: ${input.category}
 Location: ${input.region}${input.country ? ', ' + input.country : ''}
 Google Rating: ${input.googleRating ?? 'N/A'} (${input.googleReviewCount ?? 0} reviews)
-Has WhatsApp: ${input.hasWhatsapp ?? 'unknown'}
+Has WhatsApp (website): ${input.hasWhatsapp ?? 'unknown'}
+Has WhatsApp number (Google): ${input.hasWhatsappFromSource ? 'yes' : 'no'}
+Has Instagram: ${input.hasInstagram ? 'yes' : 'no'}
+Has Facebook: ${input.hasFacebook ? 'yes' : 'no'}
+Has LinkedIn: ${input.hasLinkedIn ? 'yes' : 'no'}
+Email found: ${input.emailFoundAtSource ? 'yes' : 'no'}
 Has Chatbot: ${input.hasChatbot ?? 'unknown'}
 Has Online Booking: ${input.hasOnlineBooking ?? 'unknown'}
 Review Sentiment: ${input.reviewSentimentSummary || 'No reviews analyzed'}

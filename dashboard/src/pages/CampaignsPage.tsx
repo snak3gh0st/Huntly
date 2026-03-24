@@ -22,11 +22,12 @@ export default function CampaignsPage() {
   const [name, setName] = useState('');
   const [vertical, setVertical] = useState('');
   const [regions, setRegions] = useState('');
+  const [maxLeads, setMaxLeads] = useState('50');
 
   function handleCreate(e: FormEvent) {
     e.preventDefault();
     createMutation.mutate(
-      { name, vertical, regions: regions.split(',').map((r) => r.trim()).filter(Boolean) },
+      { name, vertical, regions: regions.split(',').map((r) => r.trim()).filter(Boolean), maxLeadsPerRegion: parseInt(maxLeads) || 50 },
       {
         onSuccess: () => {
           setShowForm(false);
@@ -66,7 +67,7 @@ export default function CampaignsPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">Campaign Name</label>
               <input
@@ -90,6 +91,18 @@ export default function CampaignsPage() {
               <p className="text-[10px] text-gray-500 mt-1">
                 Type it like a Google Maps search. Examples: <span className="text-gray-400">dental clinic</span>, <span className="text-gray-400">hair salon</span>, <span className="text-gray-400">real estate agent</span>, <span className="text-gray-400">restaurant</span>, <span className="text-gray-400">law firm</span>
               </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Leads / Region</label>
+              <input
+                type="number"
+                value={maxLeads}
+                onChange={(e) => setMaxLeads(e.target.value)}
+                min="10"
+                max="200"
+                className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 focus:border-cyan-500 focus:outline-none"
+              />
+              <p className="text-[10px] text-gray-500 mt-1">Max per region (10–200)</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">Regions</label>

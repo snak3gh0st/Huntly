@@ -1,6 +1,6 @@
 import { Worker, Queue, type ConnectionOptions } from 'bullmq';
 import { redis } from '../lib/redis.js';
-import { searchBusinesses } from '../services/outscraper.service.js';
+import { searchBusinesses } from '../services/apify.service.js';
 import { leadRepo, campaignRepo } from '../db/index.js';
 import type { Prisma } from '@prisma/client';
 
@@ -27,7 +27,7 @@ export const sourceWorker = new Worker<SourceJobData>(
 
       let results;
       try {
-        results = await searchBusinesses(query);
+        results = await searchBusinesses(query, campaign.maxLeadsPerRegion ?? 50);
       } catch (err) {
         console.error(`[source] Failed to search "${query}":`, (err as Error).message);
         continue;
@@ -55,10 +55,20 @@ export const sourceWorker = new Worker<SourceJobData>(
             region,
             phone: result.phone,
             websiteUrl: result.websiteUrl,
+            email: result.emails?.[0],
             googleMapsPlaceId: result.googleMapsPlaceId,
             googleRating: result.googleRating,
             googleReviewCount: result.googleReviewCount,
-            sourceData: result.raw as Prisma.InputJsonValue,
+            sourceData: {
+              ...result.raw as Prisma.JsonObject,
+              _contacts: {
+                emails: result.emails,
+                whatsapps: result.whatsapps,
+                linkedIns: result.linkedIns,
+                instagrams: result.instagrams,
+                facebooks: result.facebooks,
+              },
+            } as Prisma.InputJsonValue,
           });
 
           totalFound++;

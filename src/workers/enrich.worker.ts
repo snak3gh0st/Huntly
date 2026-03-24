@@ -2,7 +2,6 @@ import { Worker, Queue, type ConnectionOptions } from 'bullmq';
 import { Prisma } from '@prisma/client';
 import { redis } from '../lib/redis.js';
 import { crawlWebsite, type CrawlResult } from '../services/crawler.service.js';
-import { fetchReviews } from '../services/outscraper.service.js';
 import { analyzeReviews, type ReviewAnalysis } from '../services/review-analyzer.service.js';
 import { leadRepo, enrichmentRepo } from '../db/index.js';
 
@@ -63,18 +62,23 @@ export const enrichWorker = new Worker<EnrichJobData>(
           })
         : Promise.resolve(null),
 
-      // Task 2: Fetch reviews → analyze
-      lead.googleMapsPlaceId
-        ? fetchReviews(lead.googleMapsPlaceId)
-            .then(async ({ reviews, rating }) => {
-              const analysis = await analyzeReviews(reviews);
-              return { reviews, rating, analysis };
-            })
-            .catch((err) => {
-              errors.push(`reviews: ${(err as Error).message}`);
-              return null;
-            })
-        : Promise.resolve(null),
+      // Task 2: Extract reviews from Apify source data → analyze
+      (async () => {
+        try {
+          const raw = lead.sourceData as Record<string, unknown> | null;
+          const rawReviews = Array.isArray(raw?.reviews) ? raw.reviews as Record<string, unknown>[] : [];
+          if (rawReviews.length === 0) return null;
+          const reviews = rawReviews
+            .map((r) => (r.text ?? r.reviewText ?? r.snippet ?? '') as string)
+            .filter((t) => typeof t === 'string' && t.length > 10);
+          const rating = (raw?.totalScore as number) ?? 0;
+          const analysis = await analyzeReviews(reviews);
+          return { reviews, rating, analysis };
+        } catch (err) {
+          errors.push(`reviews: ${(err as Error).message}`);
+          return null;
+        }
+      })(),
     ];
 
     const [crawlResult, reviewResult] = await Promise.allSettled(tasks).then(
@@ -85,15 +89,21 @@ export const enrichWorker = new Worker<EnrichJobData>(
         ],
     );
 
-    // Pick best email from crawl results
-    const bestEmail = crawlResult ? pickBestEmail(crawlResult.emails) : null;
+    // Merge emails: crawl + Apify source data
+    const sourceContacts = (lead.sourceData as any)?._contacts ?? {};
+    const apifyEmails: string[] = Array.isArray(sourceContacts.emails) ? sourceContacts.emails : [];
+    const allEmails = [...(crawlResult?.emails ?? []), ...apifyEmails];
+    const bestEmail = allEmails.length > 0 ? pickBestEmail(allEmails) : null;
 
-    // Extract owner name from Google Maps source data (Outscraper owner_title field)
+    // Use WhatsApp from Apify if crawl didn't detect it
+    const apifyWhatsapps: string[] = Array.isArray(sourceContacts.whatsapps) ? sourceContacts.whatsapps : [];
+    const hasWhatsapp = crawlResult?.hasWhatsapp ?? (apifyWhatsapps.length > 0 ? true : null);
+
     const ownerName = (lead.sourceData as any)?.owner_title ?? null;
 
     // Save enrichment data
     await enrichmentRepo.upsert(leadId, {
-      hasWhatsapp: crawlResult?.hasWhatsapp ?? null,
+      hasWhatsapp: hasWhatsapp,
       hasChatbot: crawlResult?.hasChatbot ?? null,
       hasOnlineBooking: crawlResult?.hasOnlineBooking ?? null,
       emailsFound: crawlResult?.emails ?? [],

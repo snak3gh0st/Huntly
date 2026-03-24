@@ -4,7 +4,8 @@ import 'dotenv/config';
 export const env = cleanEnv(process.env, {
   DATABASE_URL: url(),
   REDIS_URL: url({ default: 'redis://localhost:6379' }),
-  OUTSCRAPER_API_KEY: str(),
+  APIFY_API_TOKEN: str(),
+  OUTSCRAPER_API_KEY: str({ default: '' }),
   GROQ_API_KEY: str({ default: '' }),
   OPENAI_API_KEY: str({ default: '' }),
   AI_PROVIDER: str({ choices: ['ollama', 'groq', 'openai'], default: 'ollama' }),

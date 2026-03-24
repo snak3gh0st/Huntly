@@ -40,6 +40,7 @@ model Campaign {
   status             CampaignStatus @default(draft)
   vertical           String
   regions            String[]
+  maxLeadsPerRegion  Int            @default(50) @map("max_leads_per_region")
   emailTemplateSetId String?        @map("email_template_set_id")
   dripConfig         Json           @default("{}") @map("drip_config")
   senderAddress      String?        @map("sender_address")
