@@ -1,150 +1,180 @@
-# Huntly
+<p align="center">
+  <h1 align="center">Huntly</h1>
+  <p align="center">
+    Intelligence-first lead generation and outreach engine for B2B SaaS.
+    <br />
+    Source from Google Maps. Enrich with AI. Outreach on autopilot.
+    <br />
+    <br />
+    <a href="#quick-start">Quick Start</a>
+    &nbsp;&middot;&nbsp;
+    <a href="#features">Features</a>
+    &nbsp;&middot;&nbsp;
+    <a href="#api-reference">API Reference</a>
+    &nbsp;&middot;&nbsp;
+    <a href="https://github.com/snak3gh0st/Huntly/releases">Releases</a>
+  </p>
+</p>
 
-Intelligence-first lead generation and outreach engine for B2B SaaS companies targeting small and medium businesses.
+<br />
 
-Huntly sources leads from Google Maps, enriches them by crawling websites and analyzing reviews for pain signals, scores them with AI, and runs hyper-personalized drip email campaigns — all from a single dashboard.
+## What is Huntly?
 
-## How It Works
+Huntly finds businesses on Google Maps, crawls their websites for contact signals, reads their Google reviews to find pain points, and uses AI to score and craft hyper-personalized outreach — then sends a 3-email drip sequence with a custom demo page tailored to each lead.
+
+Instead of generic cold email, the first message references **real pain signals** from their reviews:
+
+> *"Dr. Silva, 12 of your 340 Google reviews mention patients struggling to reach Odonto Premium by phone. What if every WhatsApp message got an instant, accurate reply?"*
+
+Each lead gets a **personalized demo page** showing a simulated WhatsApp conversation for their business type — making value tangible in 10 seconds.
+
+<br />
+
+## Pipeline
 
 ```
-Source → Enrich → Qualify → Outreach
+┌─────────┐     ┌─────────┐     ┌──────────┐     ┌──────────┐
+│  Source  │────▶│ Enrich  │────▶│ Qualify  │────▶│ Outreach │
+└─────────┘     └─────────┘     └──────────┘     └──────────┘
+ Google Maps     Website crawl    AI scoring       3-email drip
+ via Apify       + review         0–100 fit        + demo page
+                 analysis         + email hook      per lead
 ```
 
-1. **Source** — Searches Google Maps via Apify for businesses matching your target vertical and regions
-2. **Enrich** — Crawls each business website (emails, WhatsApp, chatbot, booking, social profiles) + AI-analyzes their Google reviews for pain signals
-3. **Qualify** — AI scores each lead 0–100 based on fit indicators and generates a personalized email hook + simulated WhatsApp demo conversation
-4. **Outreach** — Sends a 3-email drip sequence via Resend with a personalized demo page per lead
+| Stage | What happens |
+|-------|-------------|
+| **Source** | Searches Google Maps for businesses by vertical and region. Deduplicates by Place ID. |
+| **Enrich** | Crawls up to 5 pages per site — extracts emails, WhatsApp, chatbot, booking signals, social profiles. AI-analyzes Google reviews for pain signals. |
+| **Qualify** | Scores each lead 0–100 on fit. Generates a personalized email hook and a simulated WhatsApp demo conversation. |
+| **Outreach** | Sends a 3-email drip (Day 0, 3, 7) via Resend. Pauses on reply, bounce, or unsubscribe. Respects daily warm-up caps. |
 
-## The Differentiator
+<br />
 
-Instead of generic cold email, Huntly uses review pain signals in the first email:
+## Features
 
-> "Dr. Silva, 12 of your 340 Google reviews mention patients struggling to reach Odonto Premium by phone. What if every WhatsApp message got an instant, accurate reply?"
+**Lead Pipeline**
+- 4-stage BullMQ worker pipeline (source → enrich → qualify → outreach)
+- AI-powered review analysis — extracts pain signals like "slow response", "hard to reach"
+- Website crawling for emails, WhatsApp, chatbot vendors, booking systems, social profiles
+- AI qualification scoring with personalized email hooks and demo content
+- Configurable max leads per region per campaign
 
-Each lead gets a **personalized demo page** showing a simulated WhatsApp conversation tailored to their business — making the value tangible in 10 seconds.
+**Outreach**
+- 3-email drip sequence with per-lead personalized demo pages
+- Email warm-up ramp: 20/day → 50/day over 2 weeks
+- Open, click, bounce, and reply tracking via Resend webhooks
+- Auto-pause drip on reply or unsubscribe
+- CAN-SPAM & GDPR compliant (one-click unsubscribe, physical address, instant opt-out)
+
+**Dashboard**
+- Real-time funnel: sourced → enriched → qualified → contacted → replied → converted
+- Live pipeline queue depths
+- Campaign management — create, launch, pause, monitor
+- Lead explorer with filters, sorting, and CSV export
+- Email inbox with delivery status and engagement metrics
+- Settings — toggle email, switch AI provider, manage keys (no restart needed)
+
+**AI Providers** (switchable at runtime from the dashboard)
+- **Ollama** — free, local inference
+- **Groq** — fast cloud, Llama 3.3 70B (free tier)
+- **OpenAI** — GPT-4o-mini fallback
+
+<br />
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Runtime | Node.js 22, TypeScript (ESM) |
-| HTTP | Fastify 5 |
-| Jobs | BullMQ + Redis 7 |
-| Database | PostgreSQL 16 + Prisma ORM |
-| Web Crawling | Cheerio (HTML parsing) |
-| AI | Ollama (local) / Groq (fast cloud) / OpenAI (fallback) |
-| Email | Resend |
-| Lead Sourcing | Apify (Google Maps Scraper) |
-| Frontend | React 19 + Vite + Tailwind CSS 4 + TanStack Query |
-| Charts | Recharts |
+| | Technology |
+|---|-----------|
+| **Runtime** | Node.js 22 &middot; TypeScript &middot; ESM |
+| **Server** | Fastify 5 |
+| **Queue** | BullMQ &middot; Redis 7 |
+| **Database** | PostgreSQL 16 &middot; Prisma ORM |
+| **AI** | Ollama &middot; Groq &middot; OpenAI |
+| **Email** | Resend |
+| **Scraping** | Apify (Google Maps) &middot; Cheerio (HTML) |
+| **Frontend** | React 19 &middot; Vite &middot; Tailwind CSS 4 &middot; TanStack Query &middot; Recharts |
 
-## Dashboard
-
-Real-time dashboard served directly from the backend:
-
-- **Funnel visualization** — sourced → enriched → qualified → contacted → replied → converted
-- **Pipeline status** — live job counts for each BullMQ queue
-- **Campaign management** — create, launch, pause, and monitor multiple campaigns
-- **Lead explorer** — filter and sort by status, qualification score, region, category
-- **Email inbox** — recent emails with delivery status and engagement tracking (opens/clicks)
-- **Settings** — toggle email sending, switch AI provider, manage API keys
+<br />
 
 ## Quick Start
 
-### Prerequisites
-
-- Node.js 22+
-- PostgreSQL 16+
-- Redis 7+
-- [Ollama](https://ollama.ai) (for local AI) or a Groq/OpenAI API key
-
-### Setup
+### Option A: Docker (recommended)
 
 ```bash
-# Clone and install
 git clone https://github.com/snak3gh0st/Huntly.git
 cd Huntly
-npm install
-npm --prefix dashboard install
 
-# Configure
 cp .env.example .env
-# Edit .env with your API keys
-
-# Database
-npx prisma migrate dev --name init
-
-# Seed sample campaign + email templates
-npm run seed
-```
-
-### With Docker
-
-```bash
-cp .env.example .env
-# Edit .env with your API keys
+# Edit .env — add your APIFY_API_TOKEN and ADMIN_API_KEY at minimum
 
 docker compose up -d
 docker compose exec huntly npx prisma migrate dev --name init
 ```
 
-### Full Local Stack (with Ollama)
+App is live at **http://localhost:3002**.
+
+### Option B: Local development
+
+**Prerequisites:** Node.js 22+, PostgreSQL 16+, Redis 7+, and either [Ollama](https://ollama.ai) or a Groq/OpenAI API key.
+
+```bash
+git clone https://github.com/snak3gh0st/Huntly.git
+cd Huntly
+
+npm install
+npm --prefix dashboard install
+
+cp .env.example .env
+# Edit .env with your API keys
+
+npx prisma migrate dev --name init
+npm run seed            # sample campaign + email templates
+
+npm run dev             # backend with hot reload
+cd dashboard && npm run dev   # dashboard in a second terminal
+```
+
+### Option C: Full local stack with Ollama
 
 ```bash
 npm run start:local
-# Checks/starts Ollama, pulls the default model, starts Docker services
+# Checks/starts Ollama, pulls the default model, launches Docker services
 ```
 
-### Run
+<br />
 
-```bash
-# Backend (with hot reload)
-npm run dev
+## Configuration
 
-# Dashboard (separate terminal)
-cd dashboard && npm run dev
-```
+Copy `.env.example` and fill in the required values:
 
-The app runs at `http://localhost:3002` with the dashboard served from `/`.
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `REDIS_URL` | Yes | Redis connection string |
+| `APIFY_API_TOKEN` | Yes | Google Maps scraper API token |
+| `ADMIN_API_KEY` | Yes | Protects all `/api/*` endpoints |
+| `AI_PROVIDER` | Yes | `ollama`, `groq`, or `openai` |
+| `OLLAMA_URL` | If Ollama | Ollama server URL (default `http://localhost:11434`) |
+| `OLLAMA_MODEL` | If Ollama | Model to use (default `qwen3.5:latest`) |
+| `GROQ_API_KEY` | If Groq | Groq API key |
+| `OPENAI_API_KEY` | If OpenAI | OpenAI API key |
+| `EMAIL_ENABLED` | No | Set `true` to enable outreach (default `false`) |
+| `RESEND_API_KEY` | If email | Resend API key |
+| `RESEND_WEBHOOK_SECRET` | If email | Resend webhook signing secret |
+| `SENDER_EMAIL` | If email | From address for outreach emails |
+| `SENDER_NAME` | If email | From name (default `Huntly`) |
+| `PHYSICAL_ADDRESS` | If email | CAN-SPAM compliant mailing address |
+| `WARMUP_START_DATE` | If email | Start date for warm-up ramp |
+| `BASE_URL` | If email | Public URL for demo/unsubscribe links |
+| `PORT` | No | Server port (default `3002`) |
 
-## Environment Variables
-
-```bash
-# Database & Queue
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/huntly_db
-REDIS_URL=redis://localhost:6379
-
-# Lead Sourcing
-APIFY_API_TOKEN=           # Required — Google Maps scraper
-
-# AI Provider (pick one, switchable at runtime via dashboard)
-AI_PROVIDER=ollama         # ollama | groq | openai
-OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=qwen3.5:latest
-GROQ_API_KEY=
-OPENAI_API_KEY=
-
-# Email (optional — set EMAIL_ENABLED=true to turn on outreach)
-EMAIL_ENABLED=false
-RESEND_API_KEY=
-RESEND_WEBHOOK_SECRET=
-SENDER_EMAIL=hello@yourdomain.com
-SENDER_NAME=Huntly
-PHYSICAL_ADDRESS="Your physical address"
-WARMUP_START_DATE=2026-03-19
-
-# Server
-BASE_URL=https://yourdomain.com
-PORT=3002
-NODE_ENV=development
-ADMIN_API_KEY=             # Protects API endpoints
-```
+<br />
 
 ## Usage
 
-### 1. Create a Campaign
+### 1. Create a campaign
 
-Use the dashboard or the API:
+From the dashboard, or via API:
 
 ```bash
 curl -X POST http://localhost:3002/api/campaigns \
@@ -158,24 +188,22 @@ curl -X POST http://localhost:3002/api/campaigns \
   }'
 ```
 
-### 2. Launch It
+### 2. Launch
 
 ```bash
 curl -X POST http://localhost:3002/api/campaigns/{id}/launch \
   -H "x-api-key: YOUR_API_KEY"
 ```
 
-The pipeline runs automatically. Leads are sourced, enriched, qualified, and emailed without intervention.
+The pipeline runs end-to-end automatically — sourcing, enriching, qualifying, and emailing without intervention.
 
 ### 3. Monitor
 
-Track progress from the dashboard or the API:
-
-```bash
-curl http://localhost:3002/api/funnel -H "x-api-key: YOUR_API_KEY"
-```
+Watch the funnel fill up from the dashboard, or poll the API:
 
 ```json
+GET /api/funnel
+
 {
   "sourced": 287,
   "enriched": 245,
@@ -186,57 +214,111 @@ curl http://localhost:3002/api/funnel -H "x-api-key: YOUR_API_KEY"
 }
 ```
 
-### 4. Handle Replies
+### 4. Handle replies
 
-When leads reply, the drip pauses automatically. You follow up personally with hot leads.
+When a lead replies the drip pauses automatically. Follow up personally with hot leads.
+
+<br />
 
 ## Drip Sequence
 
 | Day | Email | Strategy |
 |-----|-------|----------|
-| 0 | The Mirror | Pain signals from their reviews + personalized demo link |
-| 3 | Social Proof | Case study from a similar business |
-| 7 | Direct Offer | "Reply with your WhatsApp number, we'll set it up" |
+| 0 | **The Mirror** | Pain signals from their reviews + personalized demo link |
+| 3 | **Social Proof** | Case study from a similar business |
+| 7 | **Direct Offer** | Clear CTA — "Reply with your WhatsApp number, we'll set it up" |
 
-The drip stops automatically when a lead replies, bounces, or unsubscribes.
+Drip pauses automatically on reply, bounce, or unsubscribe.
 
-## API Endpoints
+<br />
 
-### Public
+## API Reference
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/demo/:token` | Personalized demo page |
-| GET | `/unsubscribe/:token` | Unsubscribe confirmation |
-| POST | `/unsubscribe/:token` | Process unsubscribe |
-| POST | `/webhooks/resend` | Resend event webhooks |
-| POST | `/webhooks/reply` | Inbound reply detection |
-
-### Admin (requires `x-api-key` header)
+### Public endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/api/campaigns` | Create campaign |
-| GET | `/api/campaigns` | List campaigns |
-| GET | `/api/campaigns/:id` | Campaign detail + funnel |
-| PATCH | `/api/campaigns/:id` | Update campaign |
-| POST | `/api/campaigns/:id/launch` | Launch campaign |
-| GET | `/api/campaigns/:id/leads` | List leads (filterable) |
-| GET | `/api/campaigns/:id/leads/export` | Export leads as CSV |
-| GET | `/api/leads/:id` | Lead detail |
-| POST | `/api/leads/:id/approve` | Approve lead for outreach |
-| POST | `/api/leads/:id/skip` | Skip lead |
-| POST | `/api/leads/:id/convert` | Mark as converted |
-| GET | `/api/funnel` | Aggregate funnel stats |
-| GET | `/api/campaigns/:id/emails` | List outreach emails |
-| POST | `/api/leads/:id/pause-drip` | Pause drip manually |
-| GET | `/api/stats` | Sending stats |
+| `GET` | `/demo/:token` | Personalized demo page |
+| `GET` | `/unsubscribe/:token` | Unsubscribe confirmation page |
+| `POST` | `/unsubscribe/:token` | Process unsubscribe |
+| `POST` | `/webhooks/resend` | Resend event webhooks |
+| `POST` | `/webhooks/reply` | Inbound reply detection |
 
-## Compliance
+### Admin endpoints (require `x-api-key` header)
 
-- **CAN-SPAM**: Physical address in every email, one-click unsubscribe, instant processing
-- **GDPR**: Immediate unsubscribe, no re-entry after opt-out
-- **Email Deliverability**: Domain warm-up (20/day → 50/day over 2 weeks), SPF/DKIM/DMARC via Resend
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/campaigns` | Create campaign |
+| `GET` | `/api/campaigns` | List campaigns |
+| `GET` | `/api/campaigns/:id` | Campaign detail + funnel |
+| `PATCH` | `/api/campaigns/:id` | Update campaign |
+| `POST` | `/api/campaigns/:id/launch` | Launch pipeline |
+| `GET` | `/api/campaigns/:id/leads` | List leads (filterable) |
+| `GET` | `/api/campaigns/:id/leads/export` | Export leads as CSV |
+| `GET` | `/api/leads/:id` | Lead detail |
+| `POST` | `/api/leads/:id/approve` | Approve lead for outreach |
+| `POST` | `/api/leads/:id/skip` | Skip lead |
+| `POST` | `/api/leads/:id/convert` | Mark as converted |
+| `POST` | `/api/leads/:id/pause-drip` | Pause drip manually |
+| `GET` | `/api/campaigns/:id/emails` | List outreach emails |
+| `GET` | `/api/funnel` | Aggregate funnel stats |
+| `GET` | `/api/stats` | Sending stats |
+
+<br />
+
+## Project Structure
+
+```
+src/
+├── index.ts                # Fastify server + worker bootstrap
+├── config.ts               # Env validation (envalid)
+├── lib/                    # Prisma, Redis, AI client, tokens
+├── db/repositories/        # Data access layer
+├── services/
+│   ├── apify.service       # Google Maps search + contact extraction
+│   ├── crawler.service     # Website signal extraction (Cheerio)
+│   ├── review-analyzer     # AI pain signal extraction from reviews
+│   ├── qualifier.service   # AI scoring + personalized content gen
+│   ├── email.service       # Resend integration + HTML templates
+│   └── demo-page.service   # Personalized WhatsApp demo pages
+├── workers/
+│   ├── source.worker       # Apify → Lead records
+│   ├── enrich.worker       # Crawl + review analysis
+│   ├── qualify.worker      # AI scoring → outreach queue
+│   └── outreach.worker     # Drip engine + warm-up
+├── routes/                 # Fastify HTTP endpoints
+├── middleware/              # API key auth
+└── templates/              # HTML email + demo + unsubscribe
+
+dashboard/
+├── src/
+│   ├── pages/              # Dashboard, Campaigns, Leads, Emails, Settings
+│   ├── hooks/              # TanStack Query API hooks
+│   └── components/         # Layout, UI
+└── package.json
+
+prisma/
+└── schema.prisma           # Database models
+```
+
+<br />
+
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Backend with hot reload |
+| `npm run build` | Compile TypeScript to `dist/` |
+| `npm start` | Run compiled backend |
+| `npm run db:migrate` | Create Prisma migration |
+| `npm run db:push` | Sync schema to DB (no migration file) |
+| `npm run db:studio` | Open Prisma Studio GUI |
+| `npm run seed` | Seed sample campaign + email templates |
+| `npm test` | Run tests |
+| `npm run test:watch` | Tests in watch mode |
+| `npm run start:local` | Bootstrap Ollama + Docker services |
+
+<br />
 
 ## Cost
 
@@ -245,58 +327,23 @@ At ~100 leads/week:
 | Service | Cost |
 |---------|------|
 | Apify (Google Maps + reviews) | ~$10/mo |
-| Groq AI | $0 (free tier) |
-| Resend | $0 (free tier: 3K emails/mo) |
+| Groq AI (Llama 3.3 70B) | Free tier |
+| Resend (3K emails/mo) | Free tier |
 | **Total** | **~$10/mo** |
 
 Self-hosted Ollama brings AI cost to $0.
 
-## Scripts
+<br />
 
-```bash
-npm run dev            # Backend with hot reload
-npm run build          # Compile TypeScript
-npm start              # Run compiled backend
-npm run db:migrate     # Create Prisma migration
-npm run db:push        # Sync schema to DB
-npm run db:studio      # Open Prisma Studio
-npm run seed           # Seed sample campaign + templates
-npm test               # Run tests
-npm run test:watch     # Watch mode
-npm run start:local    # Bootstrap Ollama + Docker services
-```
+## Compliance
 
-## Project Structure
+| Regulation | Implementation |
+|------------|---------------|
+| **CAN-SPAM** | Physical address footer, one-click unsubscribe, instant opt-out processing |
+| **GDPR** | Immediate list suppression, no re-entry after unsubscribe |
+| **Deliverability** | Email warm-up ramp (20→50/day), SPF/DKIM/DMARC via Resend |
 
-```
-src/
-├── index.ts              # Fastify server + worker bootstrap
-├── config.ts             # Environment validation
-├── lib/                  # Shared utilities (Redis, Prisma, AI, tokens)
-├── db/repositories/      # Database access layer
-├── services/             # Business logic
-│   ├── apify             # Google Maps search + contact extraction
-│   ├── crawler           # Website signal extraction
-│   ├── review-analyzer   # AI review pain signal analysis
-│   ├── qualifier         # AI lead scoring + content gen
-│   ├── email             # Resend sending + template rendering
-│   └── demo-page         # Personalized demo page rendering
-├── workers/              # BullMQ pipeline workers
-│   ├── source            # Apify → raw leads
-│   ├── enrich            # Crawl + review analysis
-│   ├── qualify           # AI scoring + routing
-│   └── outreach          # Drip engine
-├── routes/               # Fastify HTTP endpoints
-├── middleware/            # API key auth
-└── templates/            # HTML email + demo + unsubscribe templates
-
-dashboard/
-├── src/
-│   ├── pages/            # Dashboard, Campaigns, Leads, Emails, Settings
-│   ├── hooks/            # React Query API hooks
-│   └── components/       # Layout, UI components
-└── package.json
-```
+<br />
 
 ## License
 
