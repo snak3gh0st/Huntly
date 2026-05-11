@@ -349,3 +349,100 @@ describe('POST /api/proposals/:id/send-email', () => {
     expect(res.statusCode).toBe(409);
   });
 });
+
+describe('POST /api/proposals/:id/mark-paid', () => {
+  it('flips approved or accepted to paid', async () => {
+    mockProposalUpdateIfStatusIn.mockResolvedValue({ id: 'p1', status: 'paid' });
+    const res = await app.inject({
+      method: 'POST', url: '/api/proposals/p1/mark-paid', headers: AUTH,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(mockProposalUpdateIfStatusIn).toHaveBeenCalledWith(
+      'p1',
+      ['approved', 'accepted'],
+      expect.objectContaining({ status: 'paid', paidAt: expect.any(Date) }),
+    );
+  });
+
+  it('returns 409 when status not approved/accepted', async () => {
+    mockProposalUpdateIfStatusIn.mockResolvedValue(null);
+    const res = await app.inject({
+      method: 'POST', url: '/api/proposals/p1/mark-paid', headers: AUTH,
+    });
+    expect(res.statusCode).toBe(409);
+  });
+});
+
+describe('POST /api/proposals/:id/deploy', () => {
+  it('generates slug and flips paid to deployed', async () => {
+    mockProposalFindById.mockResolvedValue({
+      id: 'p1', status: 'paid', lead: { businessName: 'Test Co' },
+    });
+    mockProposalUpdateIfStatusIn.mockResolvedValue({
+      id: 'p1', status: 'deployed', deployedSlug: 'test-co-abc123',
+    });
+
+    const res = await app.inject({
+      method: 'POST', url: '/api/proposals/p1/deploy', headers: AUTH,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(mockProposalUpdateIfStatusIn).toHaveBeenCalledWith(
+      'p1',
+      ['paid'],
+      expect.objectContaining({
+        status: 'deployed',
+        deployedSlug: expect.stringMatching(/^test-co-[a-z0-9]{6}$/),
+        deployedAt: expect.any(Date),
+      }),
+    );
+  });
+
+  it('returns 409 when status not paid', async () => {
+    mockProposalFindById.mockResolvedValue({
+      id: 'p1', status: 'approved', lead: { businessName: 'X' },
+    });
+    mockProposalUpdateIfStatusIn.mockResolvedValue(null);
+    const res = await app.inject({
+      method: 'POST', url: '/api/proposals/p1/deploy', headers: AUTH,
+    });
+    expect(res.statusCode).toBe(409);
+  });
+});
+
+describe('POST /api/proposals/:id/send-delivery', () => {
+  it('sends the site-delivered email when status is deployed', async () => {
+    mockProposalFindById.mockResolvedValue({
+      id: 'p1', status: 'deployed',
+      lead: { email: 'owner@biz.com', businessName: 'B', status: 'paid', unsubscribeToken: 'unsub' },
+    });
+    mockSendSiteDelivered.mockResolvedValue({ messageId: 'msg-2' });
+
+    const res = await app.inject({
+      method: 'POST', url: '/api/proposals/p1/send-delivery', headers: AUTH,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(mockSendSiteDelivered).toHaveBeenCalled();
+  });
+
+  it('returns 409 when status not deployed', async () => {
+    mockProposalFindById.mockResolvedValue({
+      id: 'p1', status: 'paid',
+      lead: { email: 'owner@biz.com', status: 'paid' },
+    });
+    const res = await app.inject({
+      method: 'POST', url: '/api/proposals/p1/send-delivery', headers: AUTH,
+    });
+    expect(res.statusCode).toBe(409);
+  });
+});
+
+describe('DELETE /api/proposals/:id', () => {
+  it('hard-deletes the proposal', async () => {
+    mockProposalDelete.mockResolvedValue({ id: 'p1' });
+    const res = await app.inject({
+      method: 'DELETE', url: '/api/proposals/p1', headers: AUTH,
+    });
+    expect(res.statusCode).toBe(204);
+    expect(mockProposalDelete).toHaveBeenCalledWith('p1');
+  });
+});
