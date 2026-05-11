@@ -5,6 +5,7 @@ import {
   renderProposalView,
   renderLiveSite,
 } from '../services/proposal-renderer.service.js';
+import { sendInternalAcceptedNotification } from '../services/proposal-email.service.js';
 import type { SiteContent } from '../services/proposal-generator.service.js';
 
 const VIEWABLE_STATUSES = new Set(['approved', 'accepted', 'paid']);
@@ -85,6 +86,16 @@ export default async function proposalRoutes(app: FastifyInstance) {
 
       // Pause the existing SigmaAI drip
       await leadRepo.markReplied(proposal.leadId);
+
+      // best-effort, do not fail the form submit if email send errors
+      try {
+        const refreshed = await proposalRepo.findById(proposal.id);
+        if (refreshed) {
+          await sendInternalAcceptedNotification(refreshed as any);
+        }
+      } catch (err) {
+        console.error('[proposal] internal-accepted notification failed:', err);
+      }
 
       const payHref = proposal.paymentLinkUrl
         ? `<p><a href="${proposal.paymentLinkUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 20px;border-radius:8px;background:#10b981;color:white;text-decoration:none;font-weight:600;">Continue to secure payment →</a></p>`
