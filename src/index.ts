@@ -13,6 +13,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 import demoRoutes from './routes/demo.routes.js';
 import unsubscribeRoutes from './routes/unsubscribe.routes.js';
 import webhookRoutes from './routes/webhook.routes.js';
+import proposalRoutes from './routes/proposal.routes.js';
 import campaignRoutes from './routes/campaign.routes.js';
 import leadRoutes from './routes/lead.routes.js';
 import outreachRoutes from './routes/outreach.routes.js';
@@ -80,6 +81,7 @@ app.post<{ Body: { enabled: boolean } }>(
 await app.register(demoRoutes, { prefix: '/demo' });
 await app.register(unsubscribeRoutes, { prefix: '/unsubscribe' });
 await app.register(webhookRoutes, { prefix: '/webhooks' });
+await app.register(proposalRoutes);
 
 // Admin routes (API key auth applied inside each route file)
 await app.register(campaignRoutes, { prefix: '/api' });
