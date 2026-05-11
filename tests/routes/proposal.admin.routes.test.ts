@@ -157,3 +157,77 @@ describe('GET /api/leads/:id/proposals + GET /api/proposals/:id', () => {
     expect(res.statusCode).toBe(404);
   });
 });
+
+describe('PATCH /api/proposals/:id', () => {
+  it('updates final tier and payment link', async () => {
+    mockProposalFindById.mockResolvedValue({ id: 'p1', status: 'draft' });
+    mockProposalUpdate.mockResolvedValue({ id: 'p1', finalTier: 'Pro', paymentLinkUrl: 'https://x' });
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/proposals/p1',
+      headers: AUTH,
+      payload: { finalTier: 'Pro', paymentLinkUrl: 'https://x' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(mockProposalUpdate).toHaveBeenCalledWith(
+      'p1',
+      expect.objectContaining({ finalTier: 'Pro', paymentLinkUrl: 'https://x' }),
+    );
+  });
+
+  it('rejects unknown tier values', async () => {
+    mockProposalFindById.mockResolvedValue({ id: 'p1', status: 'draft' });
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/proposals/p1',
+      headers: AUTH,
+      payload: { finalTier: 'Platinum' },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('returns 404 for missing proposal', async () => {
+    mockProposalFindById.mockResolvedValue(null);
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/proposals/gone',
+      headers: AUTH,
+      payload: { finalTier: 'Pro' },
+    });
+    expect(res.statusCode).toBe(404);
+  });
+});
+
+describe('POST /api/proposals/:id/regenerate', () => {
+  it('flips status to generating and enqueues a new job, only from draft or failed', async () => {
+    mockProposalUpdateIfStatusIn.mockResolvedValue({ id: 'p1', status: 'generating' });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/proposals/p1/regenerate',
+      headers: AUTH,
+      payload: { notes: 're-do' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(mockProposalUpdateIfStatusIn).toHaveBeenCalledWith(
+      'p1',
+      ['draft', 'failed'],
+      expect.objectContaining({ status: 'generating', generationError: null }),
+    );
+    expect(mockQueueAdd).toHaveBeenCalledWith('generate', { proposalId: 'p1', operatorNotes: 're-do' });
+  });
+
+  it('returns 409 when status not draft/failed', async () => {
+    mockProposalUpdateIfStatusIn.mockResolvedValue(null);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/proposals/p1/regenerate',
+      headers: AUTH,
+      payload: {},
+    });
+    expect(res.statusCode).toBe(409);
+  });
+});

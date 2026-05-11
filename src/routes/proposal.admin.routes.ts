@@ -3,6 +3,7 @@ import { apiKeyAuth } from '../middleware/api-key-auth.js';
 import { proposalRepo, leadRepo } from '../db/index.js';
 import { proposalQueue } from '../workers/proposal.worker.js';
 import { makeToken } from '../lib/slug.js';
+import { priceForTier, type Tier } from '../lib/pricing-tiers.js';
 
 const US_VARIANTS = new Set(['us', 'usa', 'united states', 'united states of america']);
 
@@ -62,6 +63,63 @@ export default async function proposalAdminRoutes(app: FastifyInstance) {
       const proposal = await proposalRepo.findById(request.params.id);
       if (!proposal) return reply.status(404).send({ error: 'Not found' });
       return proposal;
+    },
+  );
+
+  /* PATCH /api/proposals/:id */
+  const VALID_TIERS = new Set<Tier>(['Starter', 'Pro', 'Premium']);
+
+  interface PatchBody {
+    finalTier?: string;
+    paymentLinkUrl?: string | null;
+    content?: unknown;
+  }
+
+  app.patch<{ Params: { id: string }; Body: PatchBody }>(
+    '/proposals/:id',
+    async (request, reply) => {
+      const proposal = await proposalRepo.findById(request.params.id);
+      if (!proposal) return reply.status(404).send({ error: 'Not found' });
+
+      const data: Record<string, unknown> = {};
+      if (request.body.finalTier !== undefined) {
+        if (!VALID_TIERS.has(request.body.finalTier as Tier)) {
+          return reply.status(400).send({ error: 'Invalid tier', valid: [...VALID_TIERS] });
+        }
+        data.finalTier = request.body.finalTier;
+      }
+      if (request.body.paymentLinkUrl !== undefined) {
+        data.paymentLinkUrl = request.body.paymentLinkUrl;
+      }
+      if (request.body.content !== undefined) {
+        data.content = request.body.content;
+      }
+
+      const updated = await proposalRepo.update(request.params.id, data);
+      return updated;
+    },
+  );
+
+  /* POST /api/proposals/:id/regenerate */
+  app.post<{ Params: { id: string }; Body: { notes?: string } }>(
+    '/proposals/:id/regenerate',
+    async (request, reply) => {
+      const updated = await proposalRepo.updateIfStatusIn(
+        request.params.id,
+        ['draft', 'failed'],
+        { status: 'generating', generationError: null },
+      );
+      if (!updated) {
+        return reply.status(409).send({
+          error: 'Regenerate only allowed from draft or failed',
+          code: 'INVALID_STATUS_FOR_REGENERATE',
+        });
+      }
+      await proposalQueue.add('generate', {
+        proposalId: request.params.id,
+        operatorNotes: request.body?.notes,
+      });
+      return updated;
     },
   );
 }
