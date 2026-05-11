@@ -82,6 +82,7 @@ model Lead {
   enrichment     LeadEnrichment?
   qualification  LeadQualification?
   outreachEmails OutreachEmail[]
+  proposalDrafts ProposalDraft[]
 
   @@index([campaignId])
   @@index([status])
@@ -178,4 +179,42 @@ model ExcludedClient {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("excluded_clients")
+}
+
+enum ProposalStatus {
+  generating
+  draft
+  approved
+  accepted
+  paid
+  deployed
+  failed
+}
+
+model ProposalDraft {
+  id              String          @id @default(uuid())
+  leadId          String          @map("lead_id")
+  status          ProposalStatus  @default(generating)
+  token           String          @unique
+  content         Json            @default("{}")
+  suggestedTier   String?         @map("suggested_tier")
+  finalTier       String?         @map("final_tier")
+  priceCents      Int?            @map("price_cents")
+  paymentLinkUrl  String?         @map("payment_link_url")
+  acceptedName    String?         @map("accepted_name")
+  acceptedEmail   String?         @map("accepted_email")
+  acceptedPhone   String?         @map("accepted_phone")
+  acceptedAt      DateTime?       @map("accepted_at")
+  paidAt          DateTime?       @map("paid_at")
+  deployedSlug    String?         @unique @map("deployed_slug")
+  deployedAt      DateTime?       @map("deployed_at")
+  generationError String?         @map("generation_error")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([status])
+  @@map("proposal_drafts")
 }
