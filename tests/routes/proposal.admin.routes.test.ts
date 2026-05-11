@@ -32,6 +32,15 @@ vi.mock('../../src/config.js', () => ({
   env: { ADMIN_API_KEY: 'test-key' },
 }));
 
+const mockSendProposalOffer = vi.fn();
+const mockSendSiteDelivered = vi.fn();
+
+vi.mock('../../src/services/proposal-email.service.js', () => ({
+  sendProposalOfferEmail: (...a: unknown[]) => mockSendProposalOffer(...a),
+  sendSiteDeliveredEmail: (...a: unknown[]) => mockSendSiteDelivered(...a),
+  sendInternalAcceptedNotification: vi.fn(),
+}));
+
 import adminRoutes from '../../src/routes/proposal.admin.routes.js';
 
 let app: FastifyInstance;
@@ -227,6 +236,115 @@ describe('POST /api/proposals/:id/regenerate', () => {
       url: '/api/proposals/p1/regenerate',
       headers: AUTH,
       payload: {},
+    });
+    expect(res.statusCode).toBe(409);
+  });
+});
+
+describe('POST /api/proposals/:id/approve', () => {
+  const READY = {
+    id: 'p1', status: 'draft',
+    finalTier: 'Pro', paymentLinkUrl: 'https://x',
+    content: {}, leadId: 'l1', token: 'tok',
+  };
+
+  it('locks priceCents and flips status to approved', async () => {
+    mockProposalFindById.mockResolvedValue(READY);
+    mockProposalUpdateIfStatusIn.mockResolvedValue({ ...READY, status: 'approved', priceCents: 59700 });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/proposals/p1/approve',
+      headers: AUTH,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockProposalUpdateIfStatusIn).toHaveBeenCalledWith(
+      'p1',
+      ['draft'],
+      expect.objectContaining({ status: 'approved', priceCents: 59700 }),
+    );
+  });
+
+  it('returns 400 with missing-field list when finalTier or paymentLinkUrl unset', async () => {
+    mockProposalFindById.mockResolvedValue({ ...READY, finalTier: null, paymentLinkUrl: null });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/proposals/p1/approve',
+      headers: AUTH,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const body = JSON.parse(res.body);
+    expect(body.missing).toEqual(expect.arrayContaining(['finalTier', 'paymentLinkUrl']));
+  });
+
+  it('returns 409 when status not draft', async () => {
+    mockProposalFindById.mockResolvedValue({ ...READY, status: 'approved' });
+    mockProposalUpdateIfStatusIn.mockResolvedValue(null);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/proposals/p1/approve',
+      headers: AUTH,
+    });
+    expect(res.statusCode).toBe(409);
+  });
+});
+
+describe('POST /api/proposals/:id/send-email', () => {
+  it('sends the proposal-offer email', async () => {
+    mockProposalFindById.mockResolvedValue({
+      id: 'p1', status: 'approved', token: 'tok',
+      lead: { id: 'l1', email: 'owner@biz.com', businessName: 'B', unsubscribedAt: null, unsubscribeToken: 'unsub' },
+    });
+    mockSendProposalOffer.mockResolvedValue({ messageId: 'msg-1' });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/proposals/p1/send-email',
+      headers: AUTH,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(mockSendProposalOffer).toHaveBeenCalled();
+  });
+
+  it('returns 400 when lead has no email', async () => {
+    mockProposalFindById.mockResolvedValue({
+      id: 'p1', status: 'approved',
+      lead: { id: 'l1', email: null, unsubscribedAt: null },
+    });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/proposals/p1/send-email',
+      headers: AUTH,
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('returns 400 when lead unsubscribed', async () => {
+    mockProposalFindById.mockResolvedValue({
+      id: 'p1', status: 'approved',
+      lead: { id: 'l1', email: 'owner@biz.com', status: 'unsubscribed' },
+    });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/proposals/p1/send-email',
+      headers: AUTH,
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('returns 409 when proposal not approved', async () => {
+    mockProposalFindById.mockResolvedValue({
+      id: 'p1', status: 'draft',
+      lead: { id: 'l1', email: 'owner@biz.com', unsubscribedAt: null },
+    });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/proposals/p1/send-email',
+      headers: AUTH,
     });
     expect(res.statusCode).toBe(409);
   });

@@ -2,8 +2,12 @@ import type { FastifyInstance } from 'fastify';
 import { apiKeyAuth } from '../middleware/api-key-auth.js';
 import { proposalRepo, leadRepo } from '../db/index.js';
 import { proposalQueue } from '../workers/proposal.worker.js';
-import { makeToken } from '../lib/slug.js';
+import { makeToken, makeSlug } from '../lib/slug.js';
 import { priceForTier, type Tier } from '../lib/pricing-tiers.js';
+import {
+  sendProposalOfferEmail,
+  sendSiteDeliveredEmail,
+} from '../services/proposal-email.service.js';
 
 const US_VARIANTS = new Set(['us', 'usa', 'united states', 'united states of america']);
 
@@ -120,6 +124,118 @@ export default async function proposalAdminRoutes(app: FastifyInstance) {
         operatorNotes: request.body?.notes,
       });
       return updated;
+    },
+  );
+
+  /* POST /api/proposals/:id/approve */
+  app.post<{ Params: { id: string } }>(
+    '/proposals/:id/approve',
+    async (request, reply) => {
+      const proposal = await proposalRepo.findById(request.params.id);
+      if (!proposal) return reply.status(404).send({ error: 'Not found' });
+
+      const missing: string[] = [];
+      if (!proposal.finalTier)      missing.push('finalTier');
+      if (!proposal.paymentLinkUrl) missing.push('paymentLinkUrl');
+      if (missing.length > 0) {
+        return reply.status(400).send({ error: 'Missing required fields', missing });
+      }
+
+      const priceCents = priceForTier(proposal.finalTier as Tier);
+      const updated = await proposalRepo.updateIfStatusIn(
+        request.params.id,
+        ['draft'],
+        { status: 'approved', priceCents },
+      );
+      if (!updated) return reply.status(409).send({ error: 'Status is not draft' });
+
+      return updated;
+    },
+  );
+
+  /* POST /api/proposals/:id/send-email */
+  app.post<{ Params: { id: string } }>(
+    '/proposals/:id/send-email',
+    async (request, reply) => {
+      const proposal = await proposalRepo.findById(request.params.id);
+      if (!proposal) return reply.status(404).send({ error: 'Not found' });
+      if (proposal.status === 'generating' || proposal.status === 'draft' || proposal.status === 'failed') {
+        return reply.status(409).send({ error: 'Proposal not approved yet' });
+      }
+      if (!proposal.lead.email) {
+        return reply.status(400).send({ error: 'Lead has no email on file' });
+      }
+      if (proposal.lead.status === 'unsubscribed') {
+        return reply.status(400).send({ error: 'Lead is unsubscribed' });
+      }
+
+      const result = await sendProposalOfferEmail(proposal);
+      return { sent: true, messageId: result.messageId };
+    },
+  );
+
+  /* POST /api/proposals/:id/mark-paid */
+  app.post<{ Params: { id: string } }>(
+    '/proposals/:id/mark-paid',
+    async (request, reply) => {
+      const updated = await proposalRepo.updateIfStatusIn(
+        request.params.id,
+        ['approved', 'accepted'],
+        { status: 'paid', paidAt: new Date() },
+      );
+      if (!updated) return reply.status(409).send({ error: 'Status must be approved or accepted' });
+      return updated;
+    },
+  );
+
+  /* POST /api/proposals/:id/deploy */
+  app.post<{ Params: { id: string } }>(
+    '/proposals/:id/deploy',
+    async (request, reply) => {
+      const proposal = await proposalRepo.findById(request.params.id);
+      if (!proposal) return reply.status(404).send({ error: 'Not found' });
+
+      const deployedSlug = makeSlug(proposal.lead.businessName);
+      const updated = await proposalRepo.updateIfStatusIn(
+        request.params.id,
+        ['paid'],
+        { status: 'deployed', deployedSlug, deployedAt: new Date() },
+      );
+
+      if (!updated) {
+        return reply.status(409).send({ error: 'Status must be paid' });
+      }
+      return updated;
+    },
+  );
+
+  /* POST /api/proposals/:id/send-delivery */
+  app.post<{ Params: { id: string } }>(
+    '/proposals/:id/send-delivery',
+    async (request, reply) => {
+      const proposal = await proposalRepo.findById(request.params.id);
+      if (!proposal) return reply.status(404).send({ error: 'Not found' });
+      if (proposal.status !== 'deployed') {
+        return reply.status(409).send({ error: 'Proposal not deployed yet' });
+      }
+      if (!proposal.lead.email) {
+        return reply.status(400).send({ error: 'Lead has no email on file' });
+      }
+      if (proposal.lead.status === 'unsubscribed') {
+        return reply.status(400).send({ error: 'Lead is unsubscribed' });
+      }
+
+      const result = await sendSiteDeliveredEmail(proposal);
+      return { sent: true, messageId: result.messageId };
+    },
+  );
+
+  /* DELETE /api/proposals/:id */
+  app.delete<{ Params: { id: string } }>(
+    '/proposals/:id',
+    async (request, reply) => {
+      await proposalRepo.delete(request.params.id);
+      return reply.status(204).send();
     },
   );
 }
