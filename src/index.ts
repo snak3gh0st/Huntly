@@ -17,6 +17,7 @@ import proposalRoutes from './routes/proposal.routes.js';
 import campaignRoutes from './routes/campaign.routes.js';
 import leadRoutes from './routes/lead.routes.js';
 import outreachRoutes from './routes/outreach.routes.js';
+import proposalAdminRoutes from './routes/proposal.admin.routes.js';
 
 // Import workers (side-effect: starts listening on queues)
 import { sourceWorker } from './workers/source.worker.js';
@@ -87,6 +88,7 @@ await app.register(proposalRoutes);
 await app.register(campaignRoutes, { prefix: '/api' });
 await app.register(leadRoutes, { prefix: '/api' });
 await app.register(outreachRoutes, { prefix: '/api' });
+await app.register(proposalAdminRoutes, { prefix: '/api' });
 
 // Serve dashboard (static build) — only if the build exists
 const dashboardPath = resolve(__dirname, 'dashboard');
