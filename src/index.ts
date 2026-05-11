@@ -22,6 +22,7 @@ import { sourceWorker } from './workers/source.worker.js';
 import { enrichWorker } from './workers/enrich.worker.js';
 import { qualifyWorker } from './workers/qualify.worker.js';
 import { outreachWorker } from './workers/outreach.worker.js';
+import { proposalWorker } from './workers/proposal.worker.js';
 
 const app = Fastify({ logger: true });
 
@@ -108,6 +109,7 @@ const shutdown = async () => {
     enrichWorker.close(),
     qualifyWorker.close(),
     outreachWorker.close(),
+    proposalWorker.close(),
   ]);
   await app.close();
   process.exit(0);
