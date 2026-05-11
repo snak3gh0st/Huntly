@@ -17,6 +17,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.2",
     "@fastify/cors": "^11.2.0",
+    "@fastify/formbody": "^8.0.2",
     "@fastify/static": "^9.0.0",
     "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
