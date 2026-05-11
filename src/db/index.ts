@@ -4,3 +4,4 @@ export { enrichmentRepo } from './repositories/enrichment.repo.js';
 export { qualificationRepo } from './repositories/qualification.repo.js';
 export { outreachRepo } from './repositories/outreach.repo.js';
 export { excludedClientRepo } from './repositories/excluded-client.repo.js';
+export { proposalRepo } from './repositories/proposal.repo.js';
