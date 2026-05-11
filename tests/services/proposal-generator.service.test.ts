@@ -1,4 +1,19 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const mockCallAIWithProvider = vi.fn<(...args: unknown[]) => Promise<string>>();
+
+vi.mock('../../src/lib/ai.js', () => ({
+  callAIWithProvider: (...args: unknown[]) => mockCallAIWithProvider(...args),
+}));
+
+// IMPORTANT: re-import buildPrompt/generateSiteContent below the mock
+import {
+  buildSystemPrompt,
+  buildUserPrompt,
+  generateSiteContent,
+  type GeneratorInput,
+} from '../../src/services/proposal-generator.service.js';
+
 import { SiteContentSchema } from '../../src/services/proposal-generator.service.js';
 
 const VALID_CONTENT = {
@@ -89,5 +104,88 @@ describe('SiteContentSchema', () => {
       contact: { headline: 'Contact us', address: null, phone: null, whatsapp: null, hours: null },
     };
     expect(SiteContentSchema.safeParse(ok).success).toBe(true);
+  });
+});
+
+const BASE_INPUT: GeneratorInput = {
+  businessName: 'Smile Family Dental',
+  category: 'dental_clinic',
+  region: 'Austin, TX',
+  websiteUrl: 'https://smilefamilydental.example',
+  googleRating: 4.6,
+  googleReviewCount: 180,
+  hasChatbot: false,
+  hasOnlineBooking: false,
+  hasWhatsapp: false,
+  ownerName: 'Dr. Silva',
+  painSignals: [
+    { signal: 'slow_phone', count: 12, example: 'Took 4 days to return my call.' },
+  ],
+  reviewSentimentSummary: 'Patients love the staff but struggle to reach the office.',
+  personalizedHook: 'Dr. Silva, 12 of your reviewers mention phone delays...',
+  operatorNotes: 'Owner mentioned hiring an associate dentist',
+};
+
+describe('buildSystemPrompt', () => {
+  it('mentions one-time pricing and forbids "per month" phrasing', () => {
+    const sys = buildSystemPrompt();
+    expect(sys).toMatch(/one-time/i);
+    expect(sys).toMatch(/per month|subscription|monthly billing/i);
+    expect(sys).toMatch(/JSON/);
+  });
+
+  it('lists every icon name in the allowed-icons section', () => {
+    const sys = buildSystemPrompt();
+    for (const icon of ['phone', 'calendar', 'globe', 'message', 'clock', 'star']) {
+      expect(sys).toContain(icon);
+    }
+  });
+});
+
+describe('buildUserPrompt', () => {
+  it('includes business name, category, region, review count', () => {
+    const u = buildUserPrompt(BASE_INPUT);
+    expect(u).toContain('Smile Family Dental');
+    expect(u).toContain('dental_clinic');
+    expect(u).toContain('Austin, TX');
+    expect(u).toContain('180 reviews');
+  });
+
+  it('passes through pain signals with examples', () => {
+    const u = buildUserPrompt(BASE_INPUT);
+    expect(u).toContain('slow_phone');
+    expect(u).toContain('Took 4 days to return my call.');
+  });
+
+  it('includes operator notes when present', () => {
+    const u = buildUserPrompt(BASE_INPUT);
+    expect(u).toContain('Owner mentioned hiring an associate dentist');
+  });
+
+  it('omits operator-notes line when notes empty', () => {
+    const u = buildUserPrompt({ ...BASE_INPUT, operatorNotes: undefined });
+    expect(u).not.toMatch(/Operator notes:/);
+  });
+});
+
+describe('generateSiteContent', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('calls Anthropic via callAIWithProvider with json mode', async () => {
+    mockCallAIWithProvider.mockResolvedValue(JSON.stringify(VALID_CONTENT));
+    await generateSiteContent(BASE_INPUT);
+
+    expect(mockCallAIWithProvider).toHaveBeenCalledTimes(1);
+    const [provider, opts] = mockCallAIWithProvider.mock.calls[0]!;
+    expect(provider).toBe('anthropic');
+    expect(opts).toEqual(
+      expect.objectContaining({ json: true }),
+    );
+  });
+
+  it('returns the validated SiteContent', async () => {
+    mockCallAIWithProvider.mockResolvedValue(JSON.stringify(VALID_CONTENT));
+    const result = await generateSiteContent(BASE_INPUT);
+    expect(result.brand.tagline).toBe('Premier dental care');
   });
 });
