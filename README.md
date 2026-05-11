@@ -158,6 +158,7 @@ Copy `.env.example` and fill in the required values:
 | `OLLAMA_MODEL` | If Ollama | Model to use (default `qwen3.5:latest`) |
 | `GROQ_API_KEY` | If Groq | Groq API key |
 | `OPENAI_API_KEY` | If OpenAI | OpenAI API key |
+| `ANTHROPIC_API_KEY` | If using Sites | Claude API key for proposal generation |
 | `EMAIL_ENABLED` | No | Set `true` to enable outreach (default `false`) |
 | `RESEND_API_KEY` | If email | Resend API key |
 | `RESEND_WEBHOOK_SECRET` | If email | Resend webhook signing secret |
@@ -166,6 +167,7 @@ Copy `.env.example` and fill in the required values:
 | `PHYSICAL_ADDRESS` | If email | CAN-SPAM compliant mailing address |
 | `WARMUP_START_DATE` | If email | Start date for warm-up ramp |
 | `BASE_URL` | If email | Public URL for demo/unsubscribe links |
+| `SITES_BASE_URL` | No | Public domain for deployed Huntly Sites (e.g. Cloudflare-fronted). Falls back to `BASE_URL` when unset. |
 | `PORT` | No | Server port (default `3002`) |
 
 <br />
@@ -263,6 +265,44 @@ Drip pauses automatically on reply, bounce, or unsubscribe.
 | `GET` | `/api/campaigns/:id/emails` | List outreach emails |
 | `GET` | `/api/funnel` | Aggregate funnel stats |
 | `GET` | `/api/stats` | Sending stats |
+
+<br />
+
+## Huntly Sites (v1)
+
+A second product line built on the same lead pipeline: AI-drafted one-page websites sold to high-fit US leads at a flat tier price.
+
+- **Trigger:** Operator clicks the globe icon on any US lead in the campaign view to open the proposal drawer.
+- **Generation:** A Claude (Anthropic) call produces Zod-validated structured JSON; a hand-coded Tailwind+shadcn-style template renders the HTML — no AI-authored markup reaches the browser.
+- **Tiers:** Starter $297 (< 50 reviews) · Pro $597 (50–299) · Premium $997 (300+). Includes 12 months hosting.
+- **Payment:** Operator pastes a Stripe Payment Link into the proposal; mark-as-paid is manual in v1 (full Stripe Checkout automation deferred to v2).
+- **Delivery:** After payment, operator reviews and clicks **Deploy** → site goes live at `${SITES_BASE_URL}/sites/{slug}`.
+- **Hosting:** Cloudflare reverse-proxy in front of Huntly's Fastify server (no per-site Pages deployments in v1).
+- **Constraint:** US-only in v1 — guarded at the generation endpoint.
+
+**Public endpoints (no auth):**
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET`  | `/proposal/:token` | Operator-shared sales view |
+| `POST` | `/proposal/:token/accept` | Lead accept-form (pre-payment) |
+| `GET`  | `/sites/:slug` | Permanent delivered site |
+
+**Admin endpoints** (require `x-api-key`):
+
+| Method | Path | Description |
+|---|---|---|
+| `POST`   | `/api/leads/:id/proposals` | Generate (rejects 400 for non-US leads) |
+| `GET`    | `/api/leads/:id/proposals` | List for lead |
+| `GET`    | `/api/proposals/:id` | Fetch (dashboard polls during generation) |
+| `PATCH`  | `/api/proposals/:id` | Edit tier, payment link, content |
+| `POST`   | `/api/proposals/:id/regenerate` | Re-run AI (draft/failed only) |
+| `POST`   | `/api/proposals/:id/approve` | Lock price, publish proposal URL |
+| `POST`   | `/api/proposals/:id/send-email` | Send proposal-offer email to lead |
+| `POST`   | `/api/proposals/:id/mark-paid` | Operator marks paid after Stripe confirms |
+| `POST`   | `/api/proposals/:id/deploy` | Publish at `/sites/:slug` |
+| `POST`   | `/api/proposals/:id/send-delivery` | Send site-live email to lead |
+| `DELETE` | `/api/proposals/:id` | Hard delete |
 
 <br />
 
