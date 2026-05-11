@@ -189,3 +189,45 @@ describe('generateSiteContent', () => {
     expect(result.brand.tagline).toBe('Premier dental care');
   });
 });
+
+describe('generateSiteContent — retry on validation failure', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('retries once when the first response is invalid JSON', async () => {
+    mockCallAIWithProvider
+      .mockResolvedValueOnce('definitely not json')
+      .mockResolvedValueOnce(JSON.stringify(VALID_CONTENT));
+
+    const result = await generateSiteContent(BASE_INPUT);
+
+    expect(result.brand.tagline).toBe('Premier dental care');
+    expect(mockCallAIWithProvider).toHaveBeenCalledTimes(2);
+
+    const secondCall = mockCallAIWithProvider.mock.calls[1]![1] as {
+      systemPrompt: string;
+    };
+    expect(secondCall.systemPrompt).toMatch(/previous response failed validation/i);
+  });
+
+  it('retries once when first response fails schema validation', async () => {
+    const partialBad = { ...VALID_CONTENT, services: [] };  // < 4 services
+    mockCallAIWithProvider
+      .mockResolvedValueOnce(JSON.stringify(partialBad))
+      .mockResolvedValueOnce(JSON.stringify(VALID_CONTENT));
+
+    const result = await generateSiteContent(BASE_INPUT);
+    expect(result.services).toHaveLength(4);
+    expect(mockCallAIWithProvider).toHaveBeenCalledTimes(2);
+  });
+
+  it('throws after two validation failures', async () => {
+    mockCallAIWithProvider
+      .mockResolvedValueOnce('bad 1')
+      .mockResolvedValueOnce('bad 2');
+
+    await expect(generateSiteContent(BASE_INPUT)).rejects.toThrow(
+      /failed validation twice/i,
+    );
+    expect(mockCallAIWithProvider).toHaveBeenCalledTimes(2);
+  });
+});
