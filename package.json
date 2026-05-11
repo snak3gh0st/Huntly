@@ -15,6 +15,7 @@
     "start:local": "bash scripts/start.sh"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.95.2",
     "@fastify/cors": "^11.2.0",
     "@fastify/static": "^9.0.0",
     "@prisma/adapter-pg": "^7.5.0",
@@ -29,7 +30,6 @@
     "openai": "^6.32.0",
     "outscraper": "^2.2.2",
     "pg": "^8.20.0",
-
     "resend": "^6.9.4"
   },
   "devDependencies": {
