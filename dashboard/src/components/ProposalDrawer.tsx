@@ -4,6 +4,7 @@ import {
   useProposal,
   useGenerateProposal,
   useDeleteProposal,
+  useProposalAction,
 } from '../hooks/useProposals';
 import type { Proposal } from '../types/proposal';
 import { DraftStateView } from './proposal/DraftStateView';
@@ -39,6 +40,7 @@ export function ProposalDrawer({ open, onClose, lead }: Props) {
 
   const generateMut = useGenerateProposal();
   const deleteMut = useDeleteProposal();
+  const regenMut = useProposalAction('regenerate');
 
   if (!open) return null;
 
@@ -101,6 +103,13 @@ export function ProposalDrawer({ open, onClose, lead }: Props) {
             <p className="text-sm text-red-300">Generation failed</p>
             <p className="text-xs text-red-400 font-mono">{proposal.generationError ?? 'Unknown error'}</p>
             <div className="flex gap-2">
+              <button
+                onClick={() => regenMut.mutate({ id: proposal.id })}
+                disabled={regenMut.isPending}
+                className="rounded-lg bg-emerald-600 disabled:bg-gray-700 px-3 py-1.5 text-sm font-medium"
+              >
+                {regenMut.isPending ? 'Regenerating…' : 'Regenerate'}
+              </button>
               <button
                 onClick={() => deleteMut.mutate({ id: proposal.id, leadId: lead.id })}
                 className="rounded-lg border border-gray-700 px-3 py-1.5 text-sm"

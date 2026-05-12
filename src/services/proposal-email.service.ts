@@ -5,9 +5,7 @@ import { env, getSitesBaseUrl } from '../config.js';
 import { priceForTier, type Tier } from '../lib/pricing-tiers.js';
 
 type ProposalWithLead = ProposalDraft & {
-  lead: Pick<Lead, 'id' | 'email' | 'businessName' | 'unsubscribeToken' | 'campaignId'> & {
-    campaignId?: string;
-  };
+  lead: Pick<Lead, 'id' | 'email' | 'businessName' | 'unsubscribeToken' | 'campaignId'>;
 };
 
 function formatUsd(cents: number): string {
@@ -46,7 +44,7 @@ export async function sendProposalOfferEmail(
 
   await outreachRepo.create({
     leadId: proposal.leadId,
-    campaignId: proposal.lead.campaignId ?? (proposal as any).campaignId,
+    campaignId: proposal.lead.campaignId,
     sequenceNumber: 0,
     resendMessageId: messageId,
     subject: `We drafted a website for ${proposal.lead.businessName}`,
@@ -81,7 +79,7 @@ export async function sendSiteDeliveredEmail(
 
   await outreachRepo.create({
     leadId: proposal.leadId,
-    campaignId: proposal.lead.campaignId ?? (proposal as any).campaignId,
+    campaignId: proposal.lead.campaignId,
     sequenceNumber: -1,
     resendMessageId: messageId,
     subject: 'Your new website is live',

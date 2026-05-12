@@ -39,6 +39,7 @@ const baseProposal = {
   content: { proposalIntro: { salutation: 'Hi Dr. Silva,', pitch: 'Have a look.' } },
   lead: {
     id: 'l1',
+    campaignId: 'c1',
     email: 'owner@biz.com',
     businessName: 'Smile Dental',
     unsubscribeToken: 'unsub-token',

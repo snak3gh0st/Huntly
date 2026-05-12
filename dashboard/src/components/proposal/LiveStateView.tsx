@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import type { Proposal } from '../../types/proposal';
-import { useProposalAction } from '../../hooks/useProposals';
+import { useProposalAction, usePatchProposal } from '../../hooks/useProposals';
 
 function StatusBadge({ status }: { status: Proposal['status'] }) {
   const colors: Record<Proposal['status'], string> = {
@@ -14,16 +15,38 @@ function StatusBadge({ status }: { status: Proposal['status'] }) {
   return <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${colors[status]}`}>{status}</span>;
 }
 
+type BrandContent = { tagline?: string; description?: string };
+function getBrand(content: Record<string, unknown> | undefined): BrandContent {
+  return (content?.['brand'] as BrandContent | undefined) ?? {};
+}
+
 export function LiveStateView({ proposal, leadId: _leadId }: { proposal: Proposal; leadId: string }) {
   const sendEmailMut    = useProposalAction('send-email');
   const markPaidMut     = useProposalAction('mark-paid');
   const deployMut       = useProposalAction('deploy');
   const sendDeliveryMut = useProposalAction('send-delivery');
+  const patchMut        = usePatchProposal();
+
+  const initialBrand = getBrand(proposal.content);
+  const [tagline, setTagline] = useState(initialBrand.tagline ?? '');
+  const [description, setDescription] = useState(initialBrand.description ?? '');
 
   const proposalUrl = `${window.location.origin}/proposal/${proposal.token}`;
   const siteUrl = proposal.deployedSlug
     ? `${window.location.origin}/sites/${proposal.deployedSlug}`
     : null;
+
+  const saveBrand = () => {
+    patchMut.mutate({
+      id: proposal.id,
+      body: {
+        content: {
+          ...(proposal.content ?? {}),
+          brand: { tagline, description },
+        },
+      },
+    });
+  };
 
   return (
     <div className="space-y-5">
@@ -61,6 +84,40 @@ export function LiveStateView({ proposal, leadId: _leadId }: { proposal: Proposa
           <p className="text-xs text-gray-400">Paid at {new Date(proposal.paidAt).toLocaleString()}</p>
         )}
       </div>
+
+      {proposal.status === 'paid' && (
+        <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 space-y-4">
+          <p className="text-xs text-gray-400 uppercase tracking-wide">Polish content before deploy</p>
+          <div>
+            <label className="text-xs text-gray-400" htmlFor="brand-tagline">Tagline</label>
+            <input
+              id="brand-tagline"
+              value={tagline}
+              onChange={(e) => setTagline(e.target.value)}
+              maxLength={80}
+              className="mt-1 w-full rounded-lg border border-gray-800 bg-gray-950 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-400" htmlFor="brand-description">Description</label>
+            <textarea
+              id="brand-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              maxLength={280}
+              rows={3}
+              className="mt-1 w-full rounded-lg border border-gray-800 bg-gray-950 px-3 py-2 text-sm"
+            />
+          </div>
+          <button
+            onClick={saveBrand}
+            disabled={patchMut.isPending}
+            className="rounded-lg border border-gray-700 px-3 py-2 text-sm hover:border-gray-600"
+          >
+            {patchMut.isPending ? 'Saving…' : 'Save content'}
+          </button>
+        </div>
+      )}
 
       <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
         <p className="text-xs text-gray-400 uppercase tracking-wide mb-3">Actions</p>

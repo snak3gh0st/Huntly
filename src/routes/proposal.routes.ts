@@ -7,8 +7,15 @@ import {
 } from '../services/proposal-renderer.service.js';
 import { sendInternalAcceptedNotification } from '../services/proposal-email.service.js';
 import type { SiteContent } from '../services/proposal-generator.service.js';
+import { escapeHtml } from '../lib/escape-html.js';
 
 const VIEWABLE_STATUSES = new Set(['approved', 'accepted', 'paid']);
+
+/** Only render a payment-link button when the URL is plainly http(s) — blocks `javascript:` etc. */
+function isSafeHttpUrl(url: string | null | undefined): url is string {
+  if (!url) return false;
+  return /^https?:\/\//i.test(url);
+}
 
 interface AcceptBody {
   name?: string;
@@ -97,12 +104,12 @@ export default async function proposalRoutes(app: FastifyInstance) {
         console.error('[proposal] internal-accepted notification failed:', err);
       }
 
-      const payHref = proposal.paymentLinkUrl
-        ? `<p><a href="${proposal.paymentLinkUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 20px;border-radius:8px;background:#10b981;color:white;text-decoration:none;font-weight:600;">Continue to secure payment →</a></p>`
+      const payHref = isSafeHttpUrl(proposal.paymentLinkUrl)
+        ? `<p><a href="${escapeHtml(proposal.paymentLinkUrl)}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 20px;border-radius:8px;background:#10b981;color:white;text-decoration:none;font-weight:600;">Continue to secure payment →</a></p>`
         : '';
 
       return reply.type('text/html').send(
-        `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Thanks</title><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-neutral-50 p-12"><main class="max-w-xl mx-auto text-center space-y-4"><h1 class="text-2xl font-semibold">Thanks, ${name}.</h1><p class="text-neutral-600">We'll reach out within 1 business day.</p>${payHref}</main></body></html>`,
+        `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Thanks</title><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-neutral-50 p-12"><main class="max-w-xl mx-auto text-center space-y-4"><h1 class="text-2xl font-semibold">Thanks, ${escapeHtml(name!.trim())}.</h1><p class="text-neutral-600">We'll reach out within 1 business day.</p>${payHref}</main></body></html>`,
       );
     },
   );

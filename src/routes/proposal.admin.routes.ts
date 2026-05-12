@@ -8,6 +8,11 @@ import {
   sendProposalOfferEmail,
   sendSiteDeliveredEmail,
 } from '../services/proposal-email.service.js';
+import {
+  renderProposalView,
+  renderLiveSite,
+} from '../services/proposal-renderer.service.js';
+import type { SiteContent } from '../services/proposal-generator.service.js';
 
 const US_VARIANTS = new Set(['us', 'usa', 'united states', 'united states of america']);
 
@@ -67,6 +72,49 @@ export default async function proposalAdminRoutes(app: FastifyInstance) {
       const proposal = await proposalRepo.findById(request.params.id);
       if (!proposal) return reply.status(404).send({ error: 'Not found' });
       return proposal;
+    },
+  );
+
+  /* GET /api/proposals/:id/preview — operator-only HTML preview (any status, gated by API key) */
+  app.get<{ Params: { id: string } }>(
+    '/proposals/:id/preview',
+    async (request, reply) => {
+      const proposal = await proposalRepo.findById(request.params.id);
+      if (!proposal) {
+        return reply.status(404).type('text/html').send('<h1>Not found</h1>');
+      }
+
+      if (proposal.status === 'generating') {
+        return reply.type('text/html').send(
+          '<!DOCTYPE html><html><body style="font-family:system-ui;padding:32px;text-align:center;color:#525252"><p>Claude is still drafting&hellip;</p><p style="font-size:12px">This preview will populate when generation completes.</p></body></html>',
+        );
+      }
+
+      if (proposal.status === 'failed') {
+        return reply.type('text/html').send(
+          '<!DOCTYPE html><html><body style="font-family:system-ui;padding:32px;text-align:center;color:#dc2626"><p>Generation failed.</p></body></html>',
+        );
+      }
+
+      // For deployed proposals, show the live site (no sales chrome).
+      // For all other reviewable statuses (draft/approved/accepted/paid), show the proposal view.
+      const html = proposal.status === 'deployed'
+        ? renderLiveSite({
+            lead: { businessName: proposal.lead.businessName },
+            content: proposal.content as unknown as SiteContent,
+          })
+        : renderProposalView({
+            lead: { businessName: proposal.lead.businessName },
+            proposal: {
+              token: proposal.token,
+              finalTier: (proposal.finalTier ?? null) as Tier | null,
+              priceCents: proposal.priceCents,
+              paymentLinkUrl: proposal.paymentLinkUrl,
+            },
+            content: proposal.content as unknown as SiteContent,
+          });
+
+      return reply.type('text/html').send(html);
     },
   );
 
@@ -195,17 +243,24 @@ export default async function proposalAdminRoutes(app: FastifyInstance) {
       const proposal = await proposalRepo.findById(request.params.id);
       if (!proposal) return reply.status(404).send({ error: 'Not found' });
 
-      const deployedSlug = makeSlug(proposal.lead.businessName);
-      const updated = await proposalRepo.updateIfStatusIn(
-        request.params.id,
-        ['paid'],
-        { status: 'deployed', deployedSlug, deployedAt: new Date() },
-      );
-
-      if (!updated) {
-        return reply.status(409).send({ error: 'Status must be paid' });
+      // One retry on Prisma unique-constraint violation (P2002 on deployed_slug).
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const deployedSlug = makeSlug(proposal.lead.businessName);
+        try {
+          const updated = await proposalRepo.updateIfStatusIn(
+            request.params.id,
+            ['paid'],
+            { status: 'deployed', deployedSlug, deployedAt: new Date() },
+          );
+          if (!updated) return reply.status(409).send({ error: 'Status must be paid' });
+          return updated;
+        } catch (err) {
+          const code = (err as { code?: string }).code;
+          if (code === 'P2002' && attempt === 0) continue;  // collision; try again with fresh suffix
+          throw err;
+        }
       }
-      return updated;
+      return reply.status(500).send({ error: 'Slug collision retry exhausted' });
     },
   );
 

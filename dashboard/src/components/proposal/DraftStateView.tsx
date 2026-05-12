@@ -1,12 +1,30 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Proposal, Tier } from '../../types/proposal';
 import { usePatchProposal, useProposalAction, useDeleteProposal } from '../../hooks/useProposals';
 
 const TIER_PRICES: Record<Tier, number> = { Starter: 297, Pro: 597, Premium: 997 };
 
+function apiKey(): string {
+  return localStorage.getItem('huntly_api_key') ?? '';
+}
+
 export function DraftStateView({ proposal, leadId }: { proposal: Proposal; leadId: string }) {
   const [finalTier, setFinalTier] = useState<Tier>(proposal.finalTier ?? proposal.suggestedTier ?? 'Starter');
   const [paymentLinkUrl, setPaymentLinkUrl] = useState(proposal.paymentLinkUrl ?? '');
+  const [previewHtml, setPreviewHtml] = useState<string>('');
+
+  // Drafts return 404 from the public /proposal/:token route. Fetch via the
+  // admin preview endpoint (gated by x-api-key) and inject as srcDoc.
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/proposals/${proposal.id}/preview`, {
+      headers: { 'x-api-key': apiKey() },
+    })
+      .then((r) => r.text())
+      .then((html) => { if (!cancelled) setPreviewHtml(html); })
+      .catch(() => { if (!cancelled) setPreviewHtml('<p style="padding:32px;font-family:system-ui">Preview unavailable.</p>'); });
+    return () => { cancelled = true; };
+  }, [proposal.id, proposal.updatedAt]);
 
   const patchMut = usePatchProposal();
   const regenMut = useProposalAction('regenerate');
@@ -28,16 +46,15 @@ export function DraftStateView({ proposal, leadId }: { proposal: Proposal; leadI
   };
 
   const canApprove = paymentLinkUrl.trim() !== '' && !!finalTier;
-  const previewUrl = `/proposal/${proposal.token}`;
 
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-gray-800 bg-gray-900 overflow-hidden">
         <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800 text-xs text-gray-400">
           <span>Preview</span>
-          <a href={previewUrl} target="_blank" rel="noopener" className="text-cyan-400 hover:text-cyan-300">Open in new tab ↗</a>
+          <span className="text-gray-500">Draft — only visible to operators</span>
         </div>
-        <iframe src={previewUrl} className="w-full h-[480px] bg-white" title="Proposal preview" />
+        <iframe srcDoc={previewHtml} className="w-full h-[480px] bg-white" title="Proposal preview" />
       </div>
 
       <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 space-y-4">
