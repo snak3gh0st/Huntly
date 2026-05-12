@@ -1,25 +1,25 @@
-<section class="card rounded-2xl p-6 sm:p-8">
-  <h2 class="text-xl font-semibold">{{primary_label}}</h2>
-  <p class="mt-2 text-sm muted">{{reassurance}}</p>
-  <form method="POST" action="/proposal/{{token}}/accept" class="mt-6 space-y-4">
-    <div>
-      <label class="text-sm font-medium" for="acc-name">Your name</label>
-      <input id="acc-name" name="name" required class="mt-1 w-full rounded-lg border px-3 py-2 bg-transparent" />
+<section class="cta-form-section">
+  <h2 class="cta-heading">{{primary_label}}</h2>
+  <p class="cta-reassurance">{{reassurance}}</p>
+  <form method="POST" action="/proposal/{{token}}/accept" class="cta-form">
+    <div class="form-field">
+      <label class="form-label" for="acc-name">Your name</label>
+      <input id="acc-name" name="name" required class="form-input" autocomplete="name" />
     </div>
-    <div>
-      <label class="text-sm font-medium" for="acc-email">Email</label>
-      <input id="acc-email" name="email" type="email" required class="mt-1 w-full rounded-lg border px-3 py-2 bg-transparent" />
+    <div class="form-field">
+      <label class="form-label" for="acc-email">Email</label>
+      <input id="acc-email" name="email" type="email" required class="form-input" autocomplete="email" />
     </div>
-    <div>
-      <label class="text-sm font-medium" for="acc-phone">Phone or WhatsApp</label>
-      <input id="acc-phone" name="phone" required class="mt-1 w-full rounded-lg border px-3 py-2 bg-transparent" />
+    <div class="form-field">
+      <label class="form-label" for="acc-phone">Phone or WhatsApp</label>
+      <input id="acc-phone" name="phone" required class="form-input" autocomplete="tel" />
     </div>
-    <label class="flex items-start gap-2 text-sm">
-      <input type="checkbox" name="agreement" required class="mt-1" />
+    <label class="form-checkbox-row">
+      <input type="checkbox" name="agreement" required />
       <span>I authorize Huntly Sites to proceed with building this website. I understand this is a one-time payment that includes 12 months of hosting and maintenance.</span>
     </label>
-    <div class="pt-2 flex flex-col gap-3">
-      <button type="submit" class="btn-primary w-full rounded-lg px-4 py-3 font-medium">
+    <div class="form-actions">
+      <button type="submit" class="btn-primary">
         {{primary_label}}
       </button>
       {{payment_link_button}}

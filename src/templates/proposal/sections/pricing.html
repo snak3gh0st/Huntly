@@ -1,7 +1,10 @@
-<section class="card rounded-2xl p-6 sm:p-8">
-  <p class="text-sm uppercase tracking-wide muted">{{tier_label}}</p>
-  <h2 class="mt-1 text-2xl font-semibold">{{headline}}</h2>
-  <p class="mt-4 text-4xl font-bold">{{price_display}}</p>
-  <p class="text-sm muted">One-time payment, includes 12 months hosting & maintenance.</p>
-  <ul class="mt-6 space-y-2 text-sm">{{value_bullets}}</ul>
+<section class="pricing-section">
+  <p class="pricing-tier">{{tier_label}}</p>
+  <h2 class="pricing-headline">{{headline}}</h2>
+  <div class="pricing-price-wrap">
+    <span class="pricing-currency">$</span>
+    <span class="pricing-numeral">{{price_numeral}}</span>
+  </div>
+  <p class="pricing-subline">One-time payment, includes 12 months hosting &amp; maintenance.</p>
+  <ul class="pricing-bullets">{{value_bullets}}</ul>
 </section>

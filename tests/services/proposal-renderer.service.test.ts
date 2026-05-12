@@ -66,7 +66,9 @@ describe('renderProposalView', () => {
   it('renders pricing tier label and dollar amount', () => {
     const html = renderProposalView({ lead: LEAD, proposal: PROPOSAL, content: CONTENT });
     expect(html).toContain('Pro');
-    expect(html).toContain('$597');
+    // Price is split across currency ($) and numeral (597) spans per the design spec
+    expect(html).toContain('597');
+    expect(html).toContain('pricing-currency');
   });
 
   it('renders accept-form action with token', () => {
@@ -105,7 +107,10 @@ describe('renderProposalView', () => {
       proposal: PROPOSAL,
       content: noTestimonials,
     });
+    // The section heading must be absent — the template is never rendered when array is empty
     expect(html).not.toContain('What customers say');
+    // The blockquote markup (class attribute, not CSS rule) must be absent
+    expect(html).not.toContain('class="testimonial-item"');
   });
 
   it('skips null contact fields', () => {
