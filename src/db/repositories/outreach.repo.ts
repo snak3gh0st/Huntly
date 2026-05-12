@@ -2,8 +2,8 @@ import { prisma } from '../../lib/prisma.js';
 import { EmailStatus, Prisma } from '@prisma/client';
 
 export const outreachRepo = {
-  async create(data: Prisma.OutreachEmailCreateInput) {
-    return prisma.outreachEmail.create({ data });
+  async create(data: Prisma.OutreachEmailCreateInput | Prisma.OutreachEmailUncheckedCreateInput) {
+    return prisma.outreachEmail.create({ data: data as Prisma.OutreachEmailCreateInput });
   },
 
   async findByLeadId(leadId: string) {

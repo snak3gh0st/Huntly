@@ -4,6 +4,7 @@ import { ArrowLeft, Send, X, Star, Eye, ChevronDown, ChevronUp, Globe, Phone, Me
 import { toast } from 'sonner';
 import { useCampaign, useLaunchCampaign, useStopCampaign, useDeleteCampaign, useCloneCampaign, exportCampaignCsv } from '../hooks/useCampaigns';
 import { useLeads, useApproveLead, useSkipLead, useConvertLead, useEmailPreview, useCampaignAnalytics, useAppConfig, type LeadParams, type Lead } from '../hooks/useLeads';
+import { ProposalDrawer } from '../components/ProposalDrawer';
 
 const PAGE_SIZE = 50;
 
@@ -86,6 +87,7 @@ export default function CampaignDetailPage() {
   const convertMut = useConvertLead();
   const [expandedLead, setExpandedLead] = useState<string | null>(null);
   const [previewLead, setPreviewLead] = useState<string | null>(null);
+  const [proposalLead, setProposalLead] = useState<null | { id: string; businessName: string; country: string | null }>(null);
   const [sendProgress, setSendProgress] = useState<{ total: number; sent: number; failed: number; label: string } | null>(null);
   const { data: preview, isLoading: previewLoading } = useEmailPreview(previewLead);
 
@@ -474,6 +476,15 @@ export default function CampaignDetailPage() {
                     </a>
                   )}
                   <button
+                    onClick={() => setProposalLead({ id: lead.id, businessName: lead.businessName, country: lead.country ?? null })}
+                    className="p-2 text-gray-400 hover:text-gray-200 rounded-lg transition"
+                    title="Website proposal"
+                  >
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                    </svg>
+                  </button>
+                  <button
                     onClick={() => { setExpandedLead(isExpanded ? null : lead.id); if (isPreviewing) setPreviewLead(null); }}
                     className="p-2 text-gray-400 hover:text-gray-200 rounded-lg transition"
                     title="Toggle details"
@@ -646,6 +657,14 @@ export default function CampaignDetailPage() {
           </div>
         )}
       </div>
+
+      {proposalLead && (
+        <ProposalDrawer
+          open
+          onClose={() => setProposalLead(null)}
+          lead={proposalLead}
+        />
+      )}
     </div>
   );
 }

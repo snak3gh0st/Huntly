@@ -1,0 +1,28 @@
+<section class="cta-form-section">
+  <h2 class="cta-heading">{{primary_label}}</h2>
+  <p class="cta-reassurance">{{reassurance}}</p>
+  <form method="POST" action="/proposal/{{token}}/accept" class="cta-form">
+    <div class="form-field">
+      <label class="form-label" for="acc-name">Your name</label>
+      <input id="acc-name" name="name" required class="form-input" autocomplete="name" />
+    </div>
+    <div class="form-field">
+      <label class="form-label" for="acc-email">Email</label>
+      <input id="acc-email" name="email" type="email" required class="form-input" autocomplete="email" />
+    </div>
+    <div class="form-field">
+      <label class="form-label" for="acc-phone">Phone or WhatsApp</label>
+      <input id="acc-phone" name="phone" required class="form-input" autocomplete="tel" />
+    </div>
+    <label class="form-checkbox-row">
+      <input type="checkbox" name="agreement" required />
+      <span>I authorize Huntly Sites to proceed with building this website. I understand this is a one-time payment that includes 12 months of hosting and maintenance.</span>
+    </label>
+    <div class="form-actions">
+      <button type="submit" class="btn-primary">
+        {{primary_label}}
+      </button>
+      {{payment_link_button}}
+    </div>
+  </form>
+</section>

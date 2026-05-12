@@ -13,15 +13,18 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 import demoRoutes from './routes/demo.routes.js';
 import unsubscribeRoutes from './routes/unsubscribe.routes.js';
 import webhookRoutes from './routes/webhook.routes.js';
+import proposalRoutes from './routes/proposal.routes.js';
 import campaignRoutes from './routes/campaign.routes.js';
 import leadRoutes from './routes/lead.routes.js';
 import outreachRoutes from './routes/outreach.routes.js';
+import proposalAdminRoutes from './routes/proposal.admin.routes.js';
 
 // Import workers (side-effect: starts listening on queues)
 import { sourceWorker } from './workers/source.worker.js';
 import { enrichWorker } from './workers/enrich.worker.js';
 import { qualifyWorker } from './workers/qualify.worker.js';
 import { outreachWorker } from './workers/outreach.worker.js';
+import { proposalWorker } from './workers/proposal.worker.js';
 
 const app = Fastify({ logger: true });
 
@@ -79,11 +82,13 @@ app.post<{ Body: { enabled: boolean } }>(
 await app.register(demoRoutes, { prefix: '/demo' });
 await app.register(unsubscribeRoutes, { prefix: '/unsubscribe' });
 await app.register(webhookRoutes, { prefix: '/webhooks' });
+await app.register(proposalRoutes);
 
 // Admin routes (API key auth applied inside each route file)
 await app.register(campaignRoutes, { prefix: '/api' });
 await app.register(leadRoutes, { prefix: '/api' });
 await app.register(outreachRoutes, { prefix: '/api' });
+await app.register(proposalAdminRoutes, { prefix: '/api' });
 
 // Serve dashboard (static build) — only if the build exists
 const dashboardPath = resolve(__dirname, 'dashboard');
@@ -108,6 +113,7 @@ const shutdown = async () => {
     enrichWorker.close(),
     qualifyWorker.close(),
     outreachWorker.close(),
+    proposalWorker.close(),
   ]);
   await app.close();
   process.exit(0);

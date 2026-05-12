@@ -1,3 +1,4 @@
+import Anthropic from '@anthropic-ai/sdk';
 import Groq from 'groq-sdk';
 import OpenAI from 'openai';
 import { env } from '../config.js';
@@ -23,6 +24,15 @@ function openai(): OpenAI {
     _openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
   }
   return _openai;
+}
+
+let _anthropic: Anthropic | null = null;
+function anthropicClient(): Anthropic {
+  if (!_anthropic) {
+    if (!env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not set');
+    _anthropic = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  }
+  return _anthropic;
 }
 
 /** Ollama client — recreated when URL changes at runtime. */
@@ -109,6 +119,29 @@ async function callOpenAI(opts: AiCallOptions): Promise<string> {
   return content;
 }
 
+async function callAnthropic(opts: AiCallOptions): Promise<string> {
+  // For JSON-mode requests, append a strong reminder to the user prompt.
+  // Anthropic doesn't have response_format=json_object; the prompt is the contract.
+  const userPrompt = opts.json
+    ? `${opts.userPrompt}\n\nReturn ONLY valid JSON. No prose, no markdown fences.`
+    : opts.userPrompt;
+
+  const res = await anthropicClient().messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 4096,
+    temperature: 0.4,
+    system: opts.systemPrompt,
+    messages: [{ role: 'user', content: userPrompt }],
+  });
+
+  const block = res.content[0];
+  const text = block && block.type === 'text' ? block.text : '';
+  if (opts.json && !text.trim()) {
+    throw new Error('Anthropic returned empty response in JSON mode');
+  }
+  return text;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Fallback chain                                                     */
 /* ------------------------------------------------------------------ */
@@ -159,4 +192,21 @@ export async function callAI(opts: AiCallOptions): Promise<string> {
   }
 
   throw new Error('All AI providers failed');
+}
+
+/**
+ * Call a specific provider, bypassing the runtime-configured fallback chain.
+ * Use for paths that must NOT silently fall back (e.g. proposal generation must
+ * use Claude — falling back to a weaker model defeats the purpose).
+ */
+export async function callAIWithProvider(
+  provider: 'ollama' | 'groq' | 'openai' | 'anthropic',
+  opts: AiCallOptions,
+): Promise<string> {
+  switch (provider) {
+    case 'ollama':    return callOllama(opts);
+    case 'groq':      return callGroq(opts);
+    case 'openai':    return callOpenAI(opts);
+    case 'anthropic': return callAnthropic(opts);
+  }
 }

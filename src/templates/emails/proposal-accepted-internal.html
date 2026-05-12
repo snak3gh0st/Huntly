@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>{{subject}}</title></head>
+<body style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; background:#fafafa; color:#111; padding:24px;">
+  <h2>Proposal accepted</h2>
+  <ul>
+    <li><strong>Business:</strong> {{business_name}}</li>
+    <li><strong>Tier:</strong> {{tier}} — {{price_display}}</li>
+    <li><strong>Name:</strong> {{accepted_name}}</li>
+    <li><strong>Email:</strong> {{accepted_email}}</li>
+    <li><strong>Phone:</strong> {{accepted_phone}}</li>
+    <li><strong>Accepted at:</strong> {{accepted_at}}</li>
+  </ul>
+  <p><strong>Next:</strong> mark this proposal paid in the dashboard once Stripe confirms.</p>
+  <p><a href="{{dashboard_url}}">Open in dashboard</a></p>
+</body>
+</html>
