@@ -125,6 +125,13 @@ Rules:
 6. LANGUAGE — English only.
 7. NEVER make medical, legal, financial, or other regulated-industry claims (no "best dentist", no "guaranteed weight loss", no "results guaranteed").
 8. Keep tone confident and specific. Avoid generic web-design fluff.
+9. COPY BANS (per project anti-references — these are the single fastest tell that a page was templated):
+   - No generic affirmation phrases. Forbidden: "your trusted partner", "committed to excellence", "we go above and beyond", "passionate about", "dedicated to providing", "second to none", "your one-stop shop", "the difference is in the details".
+   - No fabricated trust signals. Forbidden: "trusted by thousands", "X+ happy customers", "since 19XX" unless that year appears in the data, "5-star rated" unless their actual Google rating is provided and is 5.0.
+   - No SaaS triplet copy. Forbidden: "simple. powerful. modern.", "fast. reliable. affordable.", any three-word stacked tagline with periods.
+   - No em-dashes (—) or double hyphens (--). Use commas, colons, semicolons, periods, or parentheses.
+   - No "the future of [vertical]" framing.
+10. SPECIFIC OVER GENERIC — every line of copy must tie to a concrete signal in the lead's data: their actual review quotes, their actual service category, their actual location, their actual rating. If you cannot ground a line in real data, cut it. A line that could apply to any business in this category is wrong.
 
 Return ONLY the JSON object.`;
 }

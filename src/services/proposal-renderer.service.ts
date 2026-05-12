@@ -1,3 +1,17 @@
+/**
+ * Authoritative visual spec lives in DESIGN.md at the repo root.
+ *   - OKLCH color tokens
+ *   - Fraunces + Inter type scale
+ *   - Section rhythm (4 / 5 / 4 / 5 / 4 / 6 / 2.5 / 6 rem)
+ *   - Component specs (diagnosis bullets, services grid, pull quotes, etc.)
+ *
+ * Before editing this file or any template under src/templates/proposal/:
+ *   - Invoke the `impeccable` skill (anti-slop, design discipline)
+ *   - Invoke the `design-taste-frontend` and `ui-ux-pro-max` skills
+ *   - Re-read DESIGN.md and PRODUCT.md anti-references
+ *
+ * This rule is mandated in CLAUDE.md at the repo root.
+ */
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
