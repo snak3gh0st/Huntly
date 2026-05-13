@@ -100,8 +100,8 @@ export const SiteContentSchema = z.object({
   diagnosis: z.object({
     bullets: z.array(z.object({
       icon:     IconSchema,
-      label:    z.string().min(1).max(120),
-      evidence: z.string().min(1).max(320),
+      label:    z.string().min(1).max(200),
+      evidence: z.string().min(1).max(400),
     })).min(2).max(5),
   }),
   pricingPitch: z.object({
