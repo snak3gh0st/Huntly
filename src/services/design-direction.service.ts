@@ -22,6 +22,7 @@ export const SECTION_TYPES = [
   'faq',
   'cta-banner',
   'contact',
+  'statement-moment',
 ] as const;
 
 export type SectionType = typeof SECTION_TYPES[number];
@@ -69,6 +70,7 @@ Output strict JSON matching the schema. Specifically:
   - faq: 3-6 Q&A pairs answering common customer questions
   - cta-banner: mid-page banner with a single CTA to break density
   - contact: full contact card + map
+  - statement-moment: full-bleed dark section, single large Fraunces display sentence from the manifesto or hero angle. Use when the lead has a particularly sharp positioning that deserves a standalone moment. Place between services and process, or between testimonials and contact. Maximum one per page.
 
   Every section's rationale must reference a specific signal from the Study or Strategy. Every designNote must be specific ("asymmetric two-col grid, text-left bleeds below the image column, 80vh") not generic ("clean layout"). Every contentEmphasis says what the section should emphasize for THIS lead.
 

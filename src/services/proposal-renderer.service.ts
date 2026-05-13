@@ -460,6 +460,21 @@ function renderFaq(content: RichContent): string {
   });
 }
 
+function renderStatementMoment(content: RichContent): string {
+  // Pull statement text from manifestoSeed (preferred) or heroAngle (fallback)
+  const raw = content._strategy?.manifestoSeed || content._strategy?.heroAngle || '';
+  if (!raw) return '';
+  // Trim to a single punchy sentence (first sentence, 120 chars max)
+  const firstSentence = raw.split(/[.!?]/)[0].trim();
+  const statement = firstSentence.length > 120
+    ? firstSentence.slice(0, 117) + '...'
+    : firstSentence;
+  if (!statement) return '';
+  return substitute(loadTemplate('sections/statement-moment.html'), {
+    statement: escapeHtml(statement),
+  });
+}
+
 function renderCtaBanner(
   content: RichContent,
   ctaHref: string,
@@ -510,6 +525,7 @@ const SECTION_IDS: Partial<Record<SectionType, string>> = {
   'about':           'about',
   'what-changes':    'what-changes',
   'cta-banner':      'cta-banner',
+  'statement-moment': 'statement-moment',
 };
 
 /**
@@ -560,6 +576,8 @@ function dispatchSection(
       return renderFaq(content);
     case 'cta-banner':
       return renderCtaBanner(content, ctaHref);
+    case 'statement-moment':
+      return renderStatementMoment(content);
     case 'contact':
       return renderContact(content, lead);
     default:
@@ -724,7 +742,11 @@ function renderFooter(
 
   const tagline = content.brand.tagline ? `<p class="footer-tagline">${escapeHtml(content.brand.tagline)}</p>` : '';
 
-  return `<footer class="page-footer">
+  const ribbon = `<div class="footer-ribbon" aria-label="Site credit">
+  <span class="footer-ribbon-text">&#8212; Site by Huntly Sites, drafted in 4 minutes for ${escapeHtml(lead.businessName)}</span>
+</div>`;
+
+  return `${ribbon}<footer class="page-footer">
   <div class="footer-inner">
     <div class="footer-col footer-col--brand">
       <p class="footer-name">${escapeHtml(lead.businessName)}</p>

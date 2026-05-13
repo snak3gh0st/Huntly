@@ -81,6 +81,33 @@
       }
     }
 
+    /* ── Image clip-path reveal (JS-gated) ─────────────── */
+    @media (prefers-reduced-motion: no-preference) {
+      html.js-reveal-enabled .about-image,
+      html.js-reveal-enabled .service-featured-image {
+        clip-path: inset(0 100% 0 0);
+      }
+      html.js-reveal-enabled .about-image.img-revealed,
+      html.js-reveal-enabled .service-featured-image.img-revealed {
+        transition: clip-path 1000ms cubic-bezier(0.65, 0, 0.35, 1);
+        clip-path: inset(0 0 0 0);
+      }
+    }
+
+    /* ── Hero staggered text reveal ─────────────────────── */
+    @media (prefers-reduced-motion: no-preference) {
+      .hero-eyebrow  { animation: hero-fade-up 600ms cubic-bezier(0.16, 1, 0.3, 1) 100ms both; }
+      .hero-rule     { animation: hero-fade-up 600ms cubic-bezier(0.16, 1, 0.3, 1) 160ms both; }
+      .hero-name     { animation: hero-fade-up 700ms cubic-bezier(0.16, 1, 0.3, 1) 220ms both; }
+      .hero-tagline  { animation: hero-fade-up 600ms cubic-bezier(0.16, 1, 0.3, 1) 340ms both; }
+      .hero-actions  { animation: hero-fade-up 600ms cubic-bezier(0.16, 1, 0.3, 1) 440ms both; }
+
+      @keyframes hero-fade-up {
+        from { opacity: 0; transform: translateY(16px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+    }
+
     /* ── Draft banner ────────────────────────────────── */
     .draft-banner {
       position: sticky;
@@ -1626,6 +1653,56 @@
 
     .footer-list a { text-decoration: underline; text-underline-offset: 3px; }
     .footer-list a:hover { color: var(--ink); }
+
+    /* ── Statement-moment section ─────────────────────── */
+    .statement-moment {
+      background: var(--ink);
+      color: var(--bg);
+      min-height: 80vh;
+      display: flex;
+      align-items: center;
+    }
+
+    .statement-moment-inner {
+      max-width: min(960px, calc(100% - 3rem));
+      margin-inline: auto;
+      padding-block: 6rem;
+    }
+
+    .statement-moment-text {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: clamp(2.5rem, 6vw + 1rem, 6rem);
+      line-height: 1.05;
+      letter-spacing: -0.025em;
+      color: var(--bg);
+      max-width: 22ch;
+    }
+
+    .statement-moment-rule {
+      display: block;
+      width: 48px;
+      height: 3px;
+      background: var(--accent);
+      margin-top: 2.5rem;
+    }
+
+    /* ── Footer ribbon ────────────────────────────────── */
+    .footer-ribbon {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 0.75rem 1.5rem;
+      text-align: center;
+    }
+
+    .footer-ribbon-text {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-weight: 400;
+      font-size: 0.8125rem;
+      color: var(--ink-quiet);
+      letter-spacing: 0.01em;
+    }
   </style>
 </head>
 <body>
@@ -1691,6 +1768,45 @@
       }, { threshold: 0.1 });
 
       revealSections.forEach(function(s) { revealObserver.observe(s); });
+    }
+
+    /* -- Image clip-path reveal --------------------------------- */
+    if (!prefersReduced && 'IntersectionObserver' in window) {
+      var imgObserver = new IntersectionObserver(function(entries) {
+        entries.forEach(function(e) {
+          if (e.isIntersecting) {
+            e.target.classList.add('img-revealed');
+            imgObserver.unobserve(e.target);
+          }
+        });
+      }, { threshold: 0.1 });
+
+      document.querySelectorAll('.about-image, .service-featured-image').forEach(function(img) {
+        imgObserver.observe(img);
+      });
+    }
+
+    /* -- Hero parallax (rAF-throttled, JS-driven for iOS Safari) --- */
+    if (!prefersReduced) {
+      var heroBg = document.querySelector('.hero-bg');
+      if (heroBg) {
+        var rafId = null;
+        var lastScrollY = 0;
+        function onScroll() {
+          lastScrollY = window.scrollY;
+          if (!rafId) {
+            rafId = requestAnimationFrame(function() {
+              rafId = null;
+              if (heroBg) {
+                // Translate the background image at 0.3x scroll speed
+                var offset = Math.round(lastScrollY * 0.3);
+                heroBg.style.backgroundPositionY = 'calc(50% + ' + offset + 'px)';
+              }
+            });
+          }
+        }
+        window.addEventListener('scroll', onScroll, { passive: true });
+      }
     }
 
     /* -- Scrollspy --------------------------------------------- */
