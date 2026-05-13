@@ -480,6 +480,11 @@
       text-transform: uppercase;
       color: var(--accent);
       margin-bottom: 3rem;
+      /* Typographic ornament: a narrow rule above the section label
+         signals the accent-tinted moment is intentional design, not noise. */
+      padding-top: 0.875rem;
+      border-top: 2px solid var(--accent);
+      display: inline-block;
     }
 
     .why-us-items {
@@ -1236,6 +1241,15 @@
       color: var(--ink-quiet);
     }
 
+    /* Subtle hanging ornament on process caption — marks the surface section */
+    .process-inner > .section-caption::before {
+      content: '◆  ';
+      font-size: 0.45rem;
+      letter-spacing: 0.1em;
+      color: var(--ink-quiet);
+      vertical-align: middle;
+    }
+
     .process-step-title {
       margin-top: 1.25rem;
       font-family: var(--font-body);
@@ -1322,7 +1336,7 @@
 
     /* ── FAQ section ─────────────────────────────────── */
     .faq-section {
-      background: var(--surface);
+      background: var(--bg);
       border-top: 1px solid var(--border);
     }
 
@@ -1383,10 +1397,19 @@
       max-width: 62ch;
     }
 
-    /* ── CTA banner section ───────────────────────────── */
+    /* ── Section tone utilities ──────────────────────── */
+    /* Applied per-section to establish deliberate 3-tone rhythm. */
+    .section-tone-paper   { background: var(--bg); }
+    .section-tone-surface { background: var(--surface); }
+    .section-tone-accent  { background: var(--accent-quiet); }
+    .section-tone-dark    { background: var(--ink); color: var(--bg); }
+
+    /* ── CTA banner section — HIGH-CONTRAST dark slab ── */
+    /* Switched from accent-quiet to ink so the CTA banner reads as a
+       distinct visual moment instead of repeating the peach accent.    */
     .cta-banner-section {
-      background: var(--accent-quiet);
-      border-top: 1px solid var(--border);
+      background: var(--ink);
+      color: var(--bg);
     }
 
     .cta-banner-inner {
@@ -1398,9 +1421,21 @@
       justify-content: space-between;
       gap: 2.5rem;
       flex-wrap: wrap;
+      /* Subtle top hairline in a light tone to mark the transition */
+      border-top: 1px solid oklch(0.40 0.010 50);
     }
 
     .cta-banner-text { flex: 1; min-width: 200px; }
+
+    /* Small typographic ornament — the diamond mark signals the section break */
+    .cta-banner-text::before {
+      content: '◆';
+      display: block;
+      font-size: 0.5rem;
+      letter-spacing: 0.12em;
+      color: oklch(0.62 0.011 55);
+      margin-bottom: 1rem;
+    }
 
     .cta-banner-heading {
       font-family: var(--font-display);
@@ -1408,14 +1443,14 @@
       font-size: clamp(1.5rem, 2.5vw + 1rem, 2.25rem);
       line-height: 1.15;
       letter-spacing: -0.01em;
-      color: var(--ink);
+      color: var(--bg);
       max-width: 36ch;
     }
 
     .cta-banner-sub {
       margin-top: 0.625rem;
       font-size: 1.0625rem;
-      color: var(--ink-muted);
+      color: oklch(0.92 0.005 60 / 0.7);
       max-width: 52ch;
     }
 
@@ -1423,8 +1458,8 @@
       flex-shrink: 0;
       display: inline-block;
       padding: 0.9375rem 2rem;
-      background: var(--ink);
-      color: var(--bg);
+      background: var(--bg);
+      color: var(--ink);
       font-family: var(--font-display);
       font-weight: 600;
       font-size: 1.0625rem;
@@ -1433,8 +1468,8 @@
       white-space: nowrap;
     }
 
-    .cta-banner-btn:hover { background: oklch(0.30 0.015 50); }
-    .cta-banner-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+    .cta-banner-btn:hover { background: oklch(0.96 0.006 62); }
+    .cta-banner-btn:focus-visible { outline: 2px solid var(--bg); outline-offset: 2px; }
 
     @media (max-width: 640px) {
       .cta-banner-inner { flex-direction: column; align-items: flex-start; }
