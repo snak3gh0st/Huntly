@@ -31,6 +31,24 @@ export function DraftStateView({ proposal, leadId }: { proposal: Proposal; leadI
   const approveMut = useProposalAction('approve');
   const deleteMut = useDeleteProposal();
 
+  // Drafts can't be opened via /proposal/:token (public route rejects draft status).
+  // Fetch the auth-gated admin preview, then open as a blob URL in a new tab so
+  // the operator can scroll/inspect the full site outside the cramped iframe.
+  const openFullPreview = async () => {
+    try {
+      const r = await fetch(`/api/proposals/${proposal.id}/preview`, {
+        headers: { 'x-api-key': apiKey() },
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const html = await r.text();
+      const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+      window.open(url, '_blank', 'noopener');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      window.alert('Could not load preview. Check your API key.');
+    }
+  };
+
   const save = () =>
     patchMut.mutate({
       id: proposal.id,
@@ -51,7 +69,15 @@ export function DraftStateView({ proposal, leadId }: { proposal: Proposal; leadI
     <div className="space-y-5">
       <div className="rounded-xl border border-gray-800 bg-gray-900 overflow-hidden">
         <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800 text-xs text-gray-400">
-          <span>Preview</span>
+          <div className="flex items-center gap-3">
+            <span>Preview</span>
+            <button
+              onClick={openFullPreview}
+              className="text-cyan-400 hover:text-cyan-300 underline-offset-2 hover:underline"
+            >
+              Open full preview ↗
+            </button>
+          </div>
           <span className="text-gray-500">Draft — only visible to operators</span>
         </div>
         <iframe srcDoc={previewHtml} className="w-full h-[480px] bg-white" title="Proposal preview" />
