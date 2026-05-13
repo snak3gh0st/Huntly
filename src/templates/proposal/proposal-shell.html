@@ -33,34 +33,6 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    /* ── Container ────────────────────────────────────── */
-    .page-container {
-      max-width: min(640px, calc(100% - 3rem));
-      margin-inline: auto;
-      padding-block: 3rem;
-    }
-
-    /* ── Typography helpers ───────────────────────────── */
-    .display {
-      font-family: 'Fraunces', serif;
-      font-weight: 600;
-      font-size: clamp(2.4rem, 5vw + 1rem, 4.25rem);
-      line-height: 1.05;
-      letter-spacing: -0.02em;
-    }
-
-    .caption {
-      font-family: 'Inter', sans-serif;
-      font-size: 0.75rem;
-      font-weight: 500;
-      line-height: 1.4;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--ink-quiet);
-    }
-
-    .body-large { font-size: 1.25rem; line-height: 1.5; }
-
     p { max-width: 62ch; }
 
     a { color: inherit; }
@@ -74,24 +46,11 @@
       a, button { transition: color 120ms ease-out, background-color 120ms ease-out; }
     }
 
-    /* ── Vertical rhythm — per-section margin-top ─────── */
-    /* Order: site mockup first (hero → contact), then diagnosis ("what you're missing"),
-       then pricing + accept. The lead reads it like their actual website, then is shown
-       the gap between today's site and the mockup, then is asked to buy. */
-    .brand-hero                        { /* first — no margin-top */ }
-    .services-section                  { margin-top: 4rem; }
-    .testimonials-section              { margin-top: 5rem; }
-    .contact-section                   { margin-top: 4rem; }
-    .diagnosis-section                 { margin-top: 6rem; padding-top: 4rem; border-top: 1px solid var(--border); }
-    .pricing-section                   { margin-top: 5rem; }
-    .cta-form-section                  { margin-top: 2.5rem; }
-    .page-footer                       { margin-top: 6rem; }
-
-    /* ── Draft banner (thin sticky top bar replacing the old "Hi team" intro) ─── */
+    /* ── Draft banner (thin sticky top bar) ─────────── */
     .draft-banner {
       position: sticky;
       top: 0;
-      z-index: 10;
+      z-index: 30;
       background: var(--surface);
       border-bottom: 1px solid var(--border);
       padding: 0.5rem 1rem;
@@ -117,15 +76,179 @@
       font-weight: 400;
     }
 
-    /* ── Proposal intro ───────────────────────────────── */
-    .proposal-intro {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 2rem;
+    /* ── Sticky site nav ─────────────────────────────── */
+    .site-nav {
+      position: sticky;
+      top: 29px; /* height of draft-banner */
+      z-index: 20;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      padding: 0 1.5rem;
+      height: 56px;
     }
 
-    .proposal-intro .intro-eyebrow {
+    .site-nav-name {
+      font-family: 'Fraunces', serif;
+      font-weight: 600;
+      font-size: 1.0625rem;
+      color: var(--ink);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .site-nav-links {
+      display: flex;
+      gap: 1.5rem;
+      list-style: none;
+      flex: 1;
+    }
+
+    .site-nav-links a {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--ink-muted);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .site-nav-links a:hover { color: var(--ink); }
+
+    @media (max-width: 480px) {
+      .site-nav-links { display: none; }
+    }
+
+    .site-nav-cta {
+      margin-left: auto;
+      flex-shrink: 0;
+      display: inline-block;
+      padding: 0.5rem 1.125rem;
+      background: var(--ink);
+      color: var(--bg);
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 0.875rem;
+      text-decoration: none;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    .site-nav-cta:hover { background: oklch(0.30 0.015 50); }
+
+    /* ── Hero section ───────────────────────────────── */
+    .brand-hero {
+      /* no margin-top: it's the first element in main */
+    }
+
+    .hero-bg {
+      position: relative;
+      min-height: 70vh;
+      background-color: var(--surface);
+      background-size: cover;
+      background-position: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+
+    @media (max-width: 640px) {
+      .hero-bg { min-height: 60vh; }
+    }
+
+    .hero-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 100%);
+      pointer-events: none;
+    }
+
+    /* When there's no background image, overlay has no effect — hero reads on --surface */
+    .hero-bg.hero-no-image .hero-overlay {
+      display: none;
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 1;
+      padding: 3rem 2rem 3.5rem;
+      max-width: 720px;
+    }
+
+    /* Light text on image; dark text on plain surface */
+    .hero-bg:not(.hero-no-image) .hero-eyebrow,
+    .hero-bg:not(.hero-no-image) .hero-name,
+    .hero-bg:not(.hero-no-image) .hero-tagline {
+      color: rgba(255, 255, 255, 0.92);
+    }
+
+    .hero-bg.hero-no-image .hero-eyebrow { color: var(--ink-quiet); }
+    .hero-bg.hero-no-image .hero-name    { color: var(--ink); }
+    .hero-bg.hero-no-image .hero-tagline { color: var(--ink-muted); }
+
+    .hero-eyebrow {
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 0.875rem;
+    }
+
+    .hero-name {
+      font-family: 'Fraunces', serif;
+      font-weight: 600;
+      font-size: clamp(2rem, 4vw + 1rem, 3.5rem);
+      line-height: 1.08;
+      letter-spacing: -0.02em;
+      max-width: 18ch;
+    }
+
+    .hero-tagline {
+      margin-top: 1rem;
+      font-size: 1.125rem;
+      line-height: 1.5;
+      max-width: 50ch;
+    }
+
+    .hero-cta {
+      display: inline-block;
+      margin-top: 1.75rem;
+      padding: 0.875rem 1.75rem;
+      background: var(--ink);
+      color: var(--bg);
+      font-family: 'Fraunces', serif;
+      font-weight: 600;
+      font-size: 1.0625rem;
+      text-decoration: none;
+      border-radius: 4px;
+    }
+
+    .hero-cta:hover { background: oklch(0.30 0.015 50); }
+    .hero-cta:focus-visible { outline: 2px solid var(--bg); outline-offset: 2px; }
+
+    .hero-attribution {
+      position: absolute;
+      bottom: 0.75rem;
+      right: 1rem;
+      z-index: 2;
+      font-size: 0.6875rem;
+      color: rgba(255,255,255,0.60);
+      text-decoration: none;
+    }
+
+    .hero-attribution:hover { color: rgba(255,255,255,0.85); }
+
+    /* ── Stats strip ─────────────────────────────────── */
+    .stats-strip {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0.875rem 1.5rem;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
       font-size: 0.75rem;
       font-weight: 500;
       letter-spacing: 0.08em;
@@ -133,8 +256,31 @@
       color: var(--ink-quiet);
     }
 
-    .proposal-intro .intro-salutation {
-      margin-top: 0.75rem;
+    .stats-star {
+      color: var(--accent);
+      font-size: 1rem;
+    }
+
+    .stats-text { color: var(--ink); }
+
+    /* ── Shared section inner container ──────────────── */
+    .section-inner,
+    .services-inner {
+      max-width: min(960px, calc(100% - 3rem));
+      margin-inline: auto;
+      padding-block: 4rem;
+    }
+
+    .section-caption {
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-quiet);
+    }
+
+    .section-heading {
+      margin-top: 0.5rem;
       font-family: 'Fraunces', serif;
       font-weight: 600;
       font-size: clamp(1.5rem, 1.5vw + 1rem, 2rem);
@@ -142,10 +288,208 @@
       letter-spacing: -0.01em;
     }
 
-    .proposal-intro .intro-pitch {
-      margin-top: 1rem;
+    /* ── Services section ─────────────────────────────── */
+    .services-section {
+      background: var(--surface);
+    }
+
+    .services-grid {
+      margin-top: 2rem;
+      display: grid;
+      grid-template-columns: 1fr;
+      column-gap: 1.5rem;
+      row-gap: 1.25rem;
+    }
+
+    @media (min-width: 540px) {
+      .services-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (min-width: 800px) {
+      .services-grid { grid-template-columns: 1fr 1fr 1fr; }
+    }
+
+    .service-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .service-card {
+        transition: transform 180ms ease-out, box-shadow 180ms ease-out;
+      }
+      .service-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px oklch(0.22 0.015 50 / 0.08);
+      }
+    }
+
+    .service-icon-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--accent-quiet);
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .service-icon-wrap svg { width: 18px; height: 18px; }
+
+    .service-title {
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 1.0625rem;
+      line-height: 1.3;
+      color: var(--ink);
+    }
+
+    .service-desc {
+      font-size: 0.9375rem;
       color: var(--ink-muted);
-      max-width: 62ch;
+      line-height: 1.5;
+    }
+
+    /* ── Testimonials section ─────────────────────────── */
+    .testimonials-section {
+      border-top: 1px solid var(--border);
+    }
+
+    .testimonials-list {
+      margin-top: 2.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2.5rem;
+    }
+
+    .testimonial-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.875rem;
+    }
+
+    .testimonial-stars {
+      display: flex;
+      gap: 0.2rem;
+      color: var(--accent);
+      font-size: 1rem;
+    }
+
+    .testimonial-quote {
+      font-family: 'Fraunces', serif;
+      font-weight: 600;
+      font-style: italic;
+      font-size: 1.25rem;
+      line-height: 1.45;
+      color: var(--ink);
+    }
+
+    .testimonial-attribution {
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-quiet);
+    }
+
+    .testimonial-google-link {
+      margin-top: 0.375rem;
+      display: inline-block;
+      font-size: 0.8125rem;
+      color: var(--ink-muted);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .testimonial-google-link:hover { color: var(--ink); }
+
+    /* ── Contact section ──────────────────────────────── */
+    .contact-section {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+    }
+
+    .contact-layout {
+      margin-top: 1.5rem;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+
+    @media (min-width: 640px) {
+      .contact-layout { grid-template-columns: 1fr 1fr; }
+    }
+
+    .contact-dl {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      column-gap: 1.5rem;
+      row-gap: 1rem;
+      align-items: baseline;
+    }
+
+    .contact-dl dt {
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-quiet);
+    }
+
+    .contact-dl dd {
+      font-size: 1.0625rem;
+      color: var(--ink);
+    }
+
+    .contact-map {
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .contact-map iframe {
+      display: block;
+      width: 100%;
+      height: 280px;
+      border: 0;
+    }
+
+    /* ── Sales section (proposal-only) ───────────────── */
+    .sales-section {
+      background: var(--accent-quiet);
+      border-top: 1px solid var(--border);
+    }
+
+    .sales-inner {
+      max-width: min(640px, calc(100% - 3rem));
+      margin-inline: auto;
+      padding-block: 4rem 5rem;
+    }
+
+    .sales-caption {
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+    }
+
+    .sales-heading {
+      font-family: 'Fraunces', serif;
+      font-weight: 600;
+      font-size: clamp(1.5rem, 1.5vw + 1rem, 2rem);
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      color: var(--ink);
+      margin-bottom: 2rem;
     }
 
     /* ── Diagnosis section ────────────────────────────── */
@@ -203,170 +547,11 @@
       color: var(--ink-muted);
     }
 
-    /* ── Brand hero ───────────────────────────────────── */
-    .brand-hero .hero-eyebrow {
-      font-size: 0.75rem;
-      font-weight: 500;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--ink-quiet);
-      margin-bottom: 1rem;
-    }
-
-    .brand-hero .hero-name {
-      font-family: 'Fraunces', serif;
-      font-weight: 600;
-      font-size: clamp(2.4rem, 5vw + 1rem, 4.25rem);
-      line-height: 1.05;
-      letter-spacing: -0.02em;
-    }
-
-    .brand-hero .hero-tagline {
-      margin-top: 1.5rem;
-      font-size: 1.25rem;
-      line-height: 1.5;
-      color: var(--ink-muted);
-      max-width: 62ch;
-    }
-
-    .brand-hero .hero-description {
-      margin-top: 0.75rem;
-      color: var(--ink);
-      max-width: 62ch;
-    }
-
-    /* ── Services section ─────────────────────────────── */
-    .services-section .section-caption {
-      font-size: 0.75rem;
-      font-weight: 500;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--ink-quiet);
-    }
-
-    .services-section .section-heading {
-      margin-top: 0.5rem;
-      font-family: 'Fraunces', serif;
-      font-weight: 600;
-      font-size: clamp(1.5rem, 1.5vw + 1rem, 2rem);
-      line-height: 1.15;
-      letter-spacing: -0.01em;
-    }
-
-    .services-grid {
-      margin-top: 2rem;
-      display: grid;
-      grid-template-columns: 1fr;
-      column-gap: 2rem;
-      row-gap: 2.5rem;
-    }
-
-    @media (min-width: 640px) {
-      .services-grid { grid-template-columns: 1fr 1fr; }
-    }
-
-    .service-item .service-title {
-      font-weight: 600;
-      font-size: 1.125rem;
-      line-height: 1.3;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .service-item .service-title svg { width: 16px; height: 16px; flex-shrink: 0; }
-
-    .service-item .service-desc {
-      margin-top: 0.375rem;
-      font-size: 0.9375rem;
-      color: var(--ink-muted);
-      max-width: 62ch;
-    }
-
-    /* ── Testimonials section ─────────────────────────── */
-    .testimonials-section .section-caption {
-      font-size: 0.75rem;
-      font-weight: 500;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--ink-quiet);
-    }
-
-    .testimonials-section .section-heading {
-      margin-top: 0.5rem;
-      font-family: 'Fraunces', serif;
-      font-weight: 600;
-      font-size: clamp(1.5rem, 1.5vw + 1rem, 2rem);
-      line-height: 1.15;
-      letter-spacing: -0.01em;
-    }
-
-    .testimonials-list {
-      margin-top: 2rem;
-      display: flex;
-      flex-direction: column;
-      gap: 2rem;
-    }
-
-    .testimonial-item .testimonial-quote {
-      font-family: 'Fraunces', serif;
-      font-weight: 600;
-      font-style: italic;
-      font-size: 1.25rem;
-      line-height: 1.45;
-      color: var(--ink);
-    }
-
-    .testimonial-item .testimonial-attribution {
-      margin-top: 0.75rem;
-      font-size: 0.75rem;
-      font-weight: 500;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--ink-quiet);
-    }
-
-    /* ── Contact section ──────────────────────────────── */
-    .contact-section .section-caption {
-      font-size: 0.75rem;
-      font-weight: 500;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--ink-quiet);
-    }
-
-    .contact-section .section-heading {
-      margin-top: 0.5rem;
-      font-family: 'Fraunces', serif;
-      font-weight: 600;
-      font-size: clamp(1.5rem, 1.5vw + 1rem, 2rem);
-      line-height: 1.15;
-      letter-spacing: -0.01em;
-    }
-
-    .contact-dl {
-      margin-top: 1.5rem;
-      display: grid;
-      grid-template-columns: auto 1fr;
-      column-gap: 2rem;
-      row-gap: 1rem;
-      align-items: baseline;
-    }
-
-    .contact-dl dt {
-      font-size: 0.75rem;
-      font-weight: 500;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--ink-quiet);
-    }
-
-    .contact-dl dd {
-      font-size: 1.0625rem;
-      color: var(--ink);
-    }
-
     /* ── Pricing section ──────────────────────────────── */
+    .pricing-section {
+      margin-top: 2.5rem;
+    }
+
     .pricing-section .pricing-tier {
       font-size: 0.75rem;
       font-weight: 500;
@@ -439,6 +624,10 @@
     }
 
     /* ── CTA form section ─────────────────────────────── */
+    .cta-form-section {
+      margin-top: 2.5rem;
+    }
+
     .cta-form-section .cta-heading {
       font-family: 'Fraunces', serif;
       font-weight: 600;
@@ -477,7 +666,7 @@
     .form-input {
       width: 100%;
       padding: 0.625rem 0.75rem;
-      background: transparent;
+      background: var(--bg);
       border: 1px solid var(--border);
       border-radius: 4px;
       font-family: 'Inter', sans-serif;
@@ -529,9 +718,7 @@
       text-decoration: none;
     }
 
-    .btn-primary:hover {
-      background: oklch(0.30 0.015 50);
-    }
+    .btn-primary:hover { background: oklch(0.30 0.015 50); }
 
     .btn-primary:focus-visible {
       outline: 2px solid var(--ink);
@@ -551,8 +738,9 @@
 
     /* ── Footer ───────────────────────────────────────── */
     .page-footer {
-      padding-top: 2rem;
       border-top: 1px solid var(--border);
+      padding: 2rem 1.5rem;
+      text-align: center;
     }
 
     .page-footer p {
@@ -570,18 +758,26 @@
 </head>
 <body>
   <aside class="draft-banner" aria-label="Draft preview notice">
-    <span class="draft-banner-mark" aria-hidden="true">◆</span>
+    <span class="draft-banner-mark" aria-hidden="true">&#9670;</span>
     <span>Draft preview</span>
     <span class="draft-banner-body">Built for {{business_name}} by Huntly Sites &middot; scroll down to accept</span>
   </aside>
-  <main class="page-container">
+  <header class="site-nav">
+    <span class="site-nav-name">{{business_name}}</span>
+    <nav class="site-nav-links" aria-label="Site sections">
+      <a href="#services">Services</a>
+      <a href="#reviews">Reviews</a>
+      <a href="#contact">Contact</a>
+    </nav>
+    <a href="{{cta_href}}" class="site-nav-cta">{{cta_label}}</a>
+  </header>
+  <main>
     {{brand_hero}}
+    {{stats}}
     {{services}}
     {{testimonials}}
     {{contact}}
-    {{diagnosis}}
-    {{pricing}}
-    {{cta_form}}
+    {{sales_section}}
     {{site_footer}}
   </main>
 </body>

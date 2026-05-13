@@ -18,6 +18,12 @@ import { SiteContentSchema } from '../../src/services/proposal-generator.service
 
 const VALID_CONTENT = {
   brand: { tagline: 'Premier dental care', description: 'A family-run clinic.' },
+  hero: {
+    imageQuery: 'modern dental office Austin',
+    ctaLabel:   'Book Appointment',
+    ctaAction:  'call',
+  },
+  stats: { showRating: true, showReviewCount: true },
   services: [
     { icon: 'phone', title: 'Cleanings', description: 'Routine cleanings.' },
     { icon: 'calendar', title: 'Checkups', description: 'Annual checkups.' },
@@ -104,6 +110,28 @@ describe('SiteContentSchema', () => {
       contact: { headline: 'Contact us', address: null, phone: null, whatsapp: null, hours: null },
     };
     expect(SiteContentSchema.safeParse(ok).success).toBe(true);
+  });
+
+  it('accepts hero with valid ctaAction values', () => {
+    for (const ctaAction of ['call', 'email', 'scroll-to-form'] as const) {
+      const ok = { ...VALID_CONTENT, hero: { ...VALID_CONTENT.hero, ctaAction } };
+      expect(SiteContentSchema.safeParse(ok).success).toBe(true);
+    }
+  });
+
+  it('rejects hero with invalid ctaAction', () => {
+    const bad = { ...VALID_CONTENT, hero: { ...VALID_CONTENT.hero, ctaAction: 'sms' } };
+    expect(SiteContentSchema.safeParse(bad).success).toBe(false);
+  });
+
+  it('allows stats to be null', () => {
+    const ok = { ...VALID_CONTENT, stats: null };
+    expect(SiteContentSchema.safeParse(ok).success).toBe(true);
+  });
+
+  it('rejects payload missing hero field', () => {
+    const { hero: _hero, ...bad } = VALID_CONTENT;
+    expect(SiteContentSchema.safeParse(bad).success).toBe(false);
   });
 });
 

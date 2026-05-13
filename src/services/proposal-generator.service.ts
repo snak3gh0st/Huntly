@@ -30,6 +30,15 @@ export const SiteContentSchema = z.object({
     tagline:     z.string().min(1).max(120),
     description: z.string().min(1).max(500),
   }),
+  hero: z.object({
+    imageQuery: z.string().min(1).max(80),
+    ctaLabel:   z.string().min(1).max(40),
+    ctaAction:  z.enum(['call', 'email', 'scroll-to-form']),
+  }),
+  stats: z.object({
+    showRating:      z.boolean(),
+    showReviewCount: z.boolean(),
+  }).nullable(),
   services: z.array(z.object({
     icon:        IconSchema,
     title:       z.string().min(1).max(80),
@@ -105,6 +114,8 @@ Output STRICT JSON ONLY, matching this exact schema. No markdown. No prose aroun
 Schema:
 {
   "brand": { "tagline": string<=120, "description": string<=500 },
+  "hero": { "imageQuery": string<=80, "ctaLabel": string<=40, "ctaAction": "call"|"email"|"scroll-to-form" },
+  "stats": { "showRating": boolean, "showReviewCount": boolean } | null,
   "services": [ { "icon": IconName, "title": string<=80, "description": string<=320 } ]   // 4 to 8 items
   "testimonials": [ { "quote": string<=400, "attribution": string<=120 } ]                 // 0 to 4 items
   "contact": { "headline": string<=60, "address": string|null, "phone": string|null, "whatsapp": string|null, "hours": string|null },
@@ -133,6 +144,13 @@ Rules:
    - No "the future of [vertical]" framing.
 10. SPECIFIC OVER GENERIC — every line of copy must tie to a concrete signal in the lead's data: their actual review quotes, their actual service category, their actual location, their actual rating. If you cannot ground a line in real data, cut it. A line that could apply to any business in this category is wrong.
 11. CHARACTER LIMITS ARE HARD CONSTRAINTS. Every \`string<=N\` in the schema is enforced by validation — exceeding N causes the entire response to be rejected and rewritten. If a field would naturally exceed its limit, CONDENSE it: cut connective tissue, drop a sub-clause, trim adjectives. Do this BEFORE returning the JSON, not after. NEVER return a field that exceeds its limit. Count characters carefully on the longest fields (\`description\`, \`pitch\`, \`evidence\`).
+12. HERO IMAGE QUERY — \`hero.imageQuery\` is a 2-5 word search phrase for Unsplash, specific to the business's vertical AND location when possible. Good examples: "modern dental office Austin", "Italian restaurant kitchen", "law firm conference room". Avoid people-focused queries (no "smiling dentist", no "happy customer"). Aim for interior/exterior spaces, tools of the trade, or professional environments.
+13. CTA ACTION — \`hero.ctaAction\` is one of:
+    - "call" if the business has a phone number AND the vertical is one where calling is the natural action (medical, legal, home services, auto, restaurants for reservations)
+    - "email" if email is the natural primary channel (B2B services, consultants, freelancers)
+    - "scroll-to-form" for everything else — scrolls to the accept form
+    The \`ctaLabel\` should match: "Call Now", "Book Appointment", "Get a Quote", etc.
+14. STATS STRIP — set \`stats: null\` if Google rating < 4.0 OR review count < 25 (not impressive enough to lead with). Otherwise set \`{"showRating": true, "showReviewCount": true}\` — both render together as a star rating strip.
 
 Return ONLY the JSON object.`;
 }

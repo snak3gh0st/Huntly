@@ -2,8 +2,8 @@
  * Authoritative visual spec lives in DESIGN.md at the repo root.
  *   - OKLCH color tokens
  *   - Fraunces + Inter type scale
- *   - Section rhythm (4 / 5 / 4 / 5 / 4 / 6 / 2.5 / 6 rem)
- *   - Component specs (diagnosis bullets, services grid, pull quotes, etc.)
+ *   - Section rhythm (hero → stats → services → testimonials → contact → sales)
+ *   - Component specs (diagnosis bullets, service cards, pull quotes, contact grid, etc.)
  *
  * Before editing this file or any template under src/templates/proposal/:
  *   - Invoke the `impeccable` skill (anti-slop, design discipline)
@@ -17,6 +17,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { escapeHtml } from '../lib/escape-html.js';
 import { priceForTier, type Tier } from '../lib/pricing-tiers.js';
+import { fetchUnsplash, VERTICAL_FALLBACK_QUERY, type UnsplashPhoto } from '../lib/unsplash.js';
 import type { SiteContent, IconName } from './proposal-generator.service.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -74,41 +75,123 @@ const ICON_SVG: Record<IconName, string> = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Section renderers                                                  */
+/*  CTA href resolution                                                 */
 /* ------------------------------------------------------------------ */
 
-function renderBrandHero(content: SiteContent, lead: { businessName: string }): string {
-  return substitute(loadTemplate('sections/brand-hero.html'), {
-    business_name: escapeHtml(lead.businessName),
-    tagline: escapeHtml(content.brand.tagline),
-    description: escapeHtml(content.brand.description),
+function resolveCtaHref(
+  ctaAction: 'call' | 'email' | 'scroll-to-form',
+  lead: { phone?: string | null; email?: string | null },
+): string {
+  if (ctaAction === 'call' && lead.phone) return `tel:${lead.phone}`;
+  if (ctaAction === 'email' && lead.email) return `mailto:${lead.email}`;
+  return '#accept-form';
+}
+
+/* ------------------------------------------------------------------ */
+/*  Section renderers                                                   */
+/* ------------------------------------------------------------------ */
+
+function renderBrandHero(
+  content: SiteContent,
+  lead: { businessName: string },
+  photo: UnsplashPhoto | null,
+  ctaHref: string,
+): string {
+  const hasImage = photo !== null;
+
+  const heroImgAlt = hasImage
+    ? escapeHtml(photo.alt)
+    : escapeHtml(lead.businessName);
+
+  const attribution = hasImage
+    ? `<a href="${escapeHtml(photo.attributionUrl)}" target="_blank" rel="noopener noreferrer" class="hero-attribution">${escapeHtml(photo.attribution)}</a>`
+    : '';
+
+  // Build the bg div's attributes in one place to avoid duplicate class attributes
+  let bgAttrs = `class="hero-bg${hasImage ? '' : ' hero-no-image'}"`;
+  if (hasImage) {
+    bgAttrs += ` style="background-image: url('${escapeHtml(photo.url)}')"`;
+  }
+
+  const template = loadTemplate('sections/brand-hero.html');
+  return substitute(template, {
+    business_name:    escapeHtml(lead.businessName),
+    tagline:          escapeHtml(content.brand.tagline),
+    description:      escapeHtml(content.brand.description),
+    cta_href:         escapeHtml(ctaHref),
+    cta_label:        escapeHtml(content.hero.ctaLabel),
+    hero_bg_attrs:    bgAttrs,
+    hero_img_alt:     heroImgAlt,
+    hero_attribution: attribution,
+  });
+}
+
+function renderStats(
+  content: SiteContent,
+  lead: {
+    googleRating?: number | null;
+    googleReviewCount?: number | null;
+  },
+): string {
+  if (!content.stats) return '';
+
+  const rating = lead.googleRating;
+  const reviewCount = lead.googleReviewCount;
+
+  if (!rating && !reviewCount) return '';
+
+  const parts: string[] = [];
+  if (content.stats.showRating && rating) {
+    parts.push(`${rating.toFixed(1)} stars`);
+  }
+  if (content.stats.showReviewCount && reviewCount) {
+    parts.push(`${reviewCount.toLocaleString('en-US')} reviews on Google`);
+  }
+
+  if (parts.length === 0) return '';
+
+  const ratingText = parts.join(' &middot; ');
+  return substitute(loadTemplate('sections/stats-strip.html'), {
+    rating_text: ratingText,
   });
 }
 
 function renderServices(content: SiteContent): string {
   const items = content.services
     .map((s) => `
-<div class="service-item">
-  <h3 class="service-title">${ICON_SVG[s.icon]}${escapeHtml(s.title)}</h3>
+<div class="service-card">
+  <div class="service-icon-wrap" aria-hidden="true">${ICON_SVG[s.icon]}</div>
+  <h3 class="service-title">${escapeHtml(s.title)}</h3>
   <p class="service-desc">${escapeHtml(s.description)}</p>
 </div>`)
     .join('\n');
   return substitute(loadTemplate('sections/services.html'), { items });
 }
 
-function renderTestimonials(content: SiteContent): string {
+function renderTestimonials(
+  content: SiteContent,
+  lead: { businessName: string },
+): string {
   if (content.testimonials.length === 0) return '';
+  const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lead.businessName)}`;
   const items = content.testimonials
     .map((t) => `
-<blockquote class="testimonial-item">
-  <p class="testimonial-quote">&ldquo;${escapeHtml(t.quote)}&rdquo;</p>
-  <footer class="testimonial-attribution">&#8212;&nbsp;${escapeHtml(t.attribution)}</footer>
-</blockquote>`)
+<article class="testimonial-item">
+  <div class="testimonial-stars" aria-label="5 stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+  <blockquote class="testimonial-quote">&ldquo;${escapeHtml(t.quote)}&rdquo;</blockquote>
+  <footer>
+    <p class="testimonial-attribution">&#8212;&nbsp;${escapeHtml(t.attribution)}</p>
+    <a href="${escapeHtml(googleMapsUrl)}" target="_blank" rel="noopener noreferrer" class="testimonial-google-link">Read more on Google &#8594;</a>
+  </footer>
+</article>`)
     .join('\n');
   return substitute(loadTemplate('sections/testimonials.html'), { items });
 }
 
-function renderContact(content: SiteContent): string {
+function renderContact(
+  content: SiteContent,
+  lead: { businessName: string },
+): string {
   const pairs: Array<[string, string]> = [];
   if (content.contact.address)  pairs.push(['Address',  content.contact.address]);
   if (content.contact.phone)    pairs.push(['Phone',    content.contact.phone]);
@@ -121,9 +204,17 @@ function renderContact(content: SiteContent): string {
     .map(([label, value]) => `<dt>${escapeHtml(label)}</dt>\n<dd>${escapeHtml(value)}</dd>`)
     .join('\n');
 
+  // Google Maps iframe if address is known
+  let mapEmbed = '';
+  if (content.contact.address) {
+    const mapQuery = encodeURIComponent(`${content.contact.address} ${lead.businessName}`);
+    mapEmbed = `<div class="contact-map"><iframe src="https://www.google.com/maps?q=${mapQuery}&output=embed" loading="lazy" title="Location map for ${escapeHtml(lead.businessName)}"></iframe></div>`;
+  }
+
   return substitute(loadTemplate('sections/contact.html'), {
     headline: escapeHtml(content.contact.headline),
     items,
+    map_embed: mapEmbed,
   });
 }
 
@@ -189,16 +280,44 @@ function renderCtaForm(
   });
 }
 
+function renderSalesSection(
+  content: SiteContent,
+  lead: { businessName: string },
+  proposal: { token: string; finalTier: Tier | null; priceCents: number | null; paymentLinkUrl: string | null },
+): string {
+  const diagnosis = renderDiagnosis(content);
+  const pricing = renderPricing(content, proposal);
+  const ctaForm = renderCtaForm(content, proposal);
+
+  return `
+<section class="sales-section" id="accept-form">
+  <div class="sales-inner">
+    <p class="sales-caption">Draft preview</p>
+    <h2 class="sales-heading">Want to publish this site for ${escapeHtml(lead.businessName)}?</h2>
+    ${diagnosis}
+    ${pricing}
+    ${ctaForm}
+  </div>
+</section>`;
+}
+
 function renderFooter(): string {
   return loadTemplate('sections/site-footer.html');
 }
 
 /* ------------------------------------------------------------------ */
-/*  Public renderers                                                   */
+/*  Public renderers                                                    */
 /* ------------------------------------------------------------------ */
 
-export function renderProposalView(args: {
-  lead: { businessName: string };
+export async function renderProposalView(args: {
+  lead: {
+    businessName: string;
+    phone?: string | null;
+    email?: string | null;
+    googleRating?: number | null;
+    googleReviewCount?: number | null;
+    category?: string | null;
+  };
   proposal: {
     token: string;
     finalTier: Tier | null;
@@ -206,35 +325,66 @@ export function renderProposalView(args: {
     paymentLinkUrl: string | null;
   };
   content: SiteContent;
-}): string {
-  // Order: site mockup (brand_hero → contact) reads first as the lead's actual
-  // new website. Then diagnosis ("what your current site is missing") sets up
-  // urgency. Pricing + accept close the deal. The `proposalIntro` field still
-  // exists in the schema (and the AI fills it) but is intentionally not rendered
-  // — the draft-banner in the shell handles that framing more quietly.
+}): Promise<string> {
+  const ctaHref = resolveCtaHref(args.content.hero.ctaAction, {
+    phone: args.lead.phone,
+    email: args.lead.email,
+  });
+
+  // Fetch Unsplash image (non-blocking: null = CSS-only hero)
+  const photo = await fetchUnsplash(
+    args.content.hero.imageQuery,
+    args.lead.category ?? undefined,
+  );
+
+  // Order: site mockup (hero → contact) reads first as the lead's actual
+  // new website. Then the sales section with diagnosis + pricing + form.
+  // The `proposalIntro` field exists in the schema (AI fills it) but is
+  // intentionally not rendered — the draft-banner handles that framing.
   return substitute(loadTemplate('proposal-shell.html'), {
-    business_name: escapeHtml(args.lead.businessName),
-    brand_hero: renderBrandHero(args.content, args.lead),
-    services: renderServices(args.content),
-    testimonials: renderTestimonials(args.content),
-    contact: renderContact(args.content),
-    diagnosis: renderDiagnosis(args.content),
-    pricing: renderPricing(args.content, args.proposal),
-    cta_form: renderCtaForm(args.content, args.proposal),
-    site_footer: renderFooter(),
+    business_name:  escapeHtml(args.lead.businessName),
+    cta_href:       escapeHtml(ctaHref),
+    cta_label:      escapeHtml(args.content.hero.ctaLabel),
+    brand_hero:     renderBrandHero(args.content, args.lead, photo, ctaHref),
+    stats:          renderStats(args.content, args.lead),
+    services:       renderServices(args.content),
+    testimonials:   renderTestimonials(args.content, args.lead),
+    contact:        renderContact(args.content, args.lead),
+    sales_section:  renderSalesSection(args.content, args.lead, args.proposal),
+    site_footer:    renderFooter(),
   });
 }
 
-export function renderLiveSite(args: {
-  lead: { businessName: string };
+export async function renderLiveSite(args: {
+  lead: {
+    businessName: string;
+    phone?: string | null;
+    email?: string | null;
+    googleRating?: number | null;
+    googleReviewCount?: number | null;
+    category?: string | null;
+  };
   content: SiteContent;
-}): string {
+}): Promise<string> {
+  const ctaHref = resolveCtaHref(args.content.hero.ctaAction, {
+    phone: args.lead.phone,
+    email: args.lead.email,
+  });
+
+  const photo = await fetchUnsplash(
+    args.content.hero.imageQuery,
+    args.lead.category ?? undefined,
+  );
+
   return substitute(loadTemplate('site-shell.html'), {
     business_name: escapeHtml(args.lead.businessName),
-    brand_hero: renderBrandHero(args.content, args.lead),
-    services: renderServices(args.content),
-    testimonials: renderTestimonials(args.content),
-    contact: renderContact(args.content),
-    site_footer: renderFooter(),
+    cta_href:      escapeHtml(ctaHref),
+    cta_label:     escapeHtml(args.content.hero.ctaLabel),
+    brand_hero:    renderBrandHero(args.content, args.lead, photo, ctaHref),
+    stats:         renderStats(args.content, args.lead),
+    services:      renderServices(args.content),
+    testimonials:  renderTestimonials(args.content, args.lead),
+    contact:       renderContact(args.content, args.lead),
+    site_footer:   renderFooter(),
   });
 }

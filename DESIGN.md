@@ -78,10 +78,20 @@ Within sections, paragraph rhythm is `0.75em` between paragraphs, `1.5em` before
 ## Components
 
 ### Hero
-- Eyebrow: small caps Inter 500 in `--ink-quiet`, set to ~1rem below the display heading.
-- Display heading: Fraunces 600, business name. Optical size matters — load opsz≥48 axis.
-- Tagline: body+1 (1.25rem), `--ink-muted`, 1.5rem below the display.
-- Description: body, `--ink`, capped at 62ch.
+- Full-width section, min 70vh desktop / 60vh mobile. Unsplash background image with `linear-gradient(180deg, rgba(0,0,0,0.15), rgba(0,0,0,0.55))` overlay. If no image: plain `--surface` background.
+- Eyebrow: small caps Inter 500 (business name), white on image, `--ink-quiet` on plain surface.
+- Display heading: Fraunces 600 at `clamp(2rem, 4vw + 1rem, 3.5rem)`. Tagline text from `brand.tagline`. White on image, `--ink` on plain.
+- Tagline paragraph: 1.125rem below display, white / `--ink-muted`.
+- CTA button: Fraunces 600, `--ink` background, `--bg` text, anchored at bottom-left of hero. Href resolved from `hero.ctaAction` (tel:, mailto:, or #accept-form).
+- Unsplash attribution: `0.6875rem` white 60% opacity link bottom-right. Required by Unsplash TOS.
+
+### Sticky nav
+- Position sticky, `--bg` background, 56px height, 1px border-bottom `--border`.
+- Business name in Fraunces 600 left side. Links (Services / Reviews / Contact) center. CTA button (`--ink` bg) right.
+
+### Stats strip (optional)
+- Rendered only when `content.stats !== null` AND lead has googleRating + googleReviewCount.
+- `--surface` background, border-bottom, centered. Small caps caption. Star glyph in `--accent`. Format: "★ 4.8 · 247 reviews on Google".
 
 ### Diagnosis bullets
 - NOT cards. Inline blocks separated by a thin top border (`1px solid --border`).
@@ -91,20 +101,27 @@ Within sections, paragraph rhythm is `0.75em` between paragraphs, `1.5em` before
 - Stack with 1.25rem vertical gap. First item has no top border.
 
 ### Services
-- 2-column grid on viewports ≥640px (single column below).
-- No cards. Type-only blocks.
-- Service title: Inter 600, body+1 (1.125rem). Optional small icon inline at title baseline (16px, currentColor, no accent).
-- Service description: body, `--ink-muted`. Max 200 chars.
-- Grid gap: 2rem column, 2.5rem row.
+- Section with `--surface` background. 1-col mobile, 2-col 540px+, 3-col 800px+.
+- Service cards: `--bg` background, 1px border, 12px border-radius, 1.5rem padding.
+- Top: 40px circle icon badge in `--accent-quiet` / `--accent` (uses `--accent` — limited to this icon context, not section background).
+- Title: Inter 600 1.0625rem. Description: 0.9375rem `--ink-muted`.
+- Hover (motion-ok): `translateY(-2px)` + subtle shadow. Hardware accelerated via transform only.
 
 ### Testimonials
-- Pull-quote treatment. Fraunces 600, italic, body+1 (1.25rem). Curly quotes via `&ldquo;…&rdquo;`.
-- Attribution: Inter 500 small caps, `--ink-quiet`, leading em-dash typeset as `—`.
-- Stack with 2rem gap. No cards, no boxed backgrounds.
+- Pull-quote treatment. 5 star glyphs in `--accent` above each quote.
+- Fraunces 600 italic body+1 (1.25rem). Curly quotes via `&ldquo;…&rdquo;`.
+- Attribution: Inter 500 small caps, `--ink-quiet`, leading em-dash `&#8212;`.
+- "Read more on Google →" link below attribution. Stack with 2.5rem gap.
 
 ### Contact
-- Definition-list pattern. `<dl>` with `<dt>` (caption style — small caps, `--ink-quiet`) and `<dd>` (body, `--ink`).
-- 2-column grid on viewports ≥640px (label column auto, value column 1fr) — but rendered as a single visual rhythm, not boxed.
+- Section with `--surface` background. 2-column desktop: `<dl>` card left, Google Maps iframe right (if address known).
+- Definition-list: `<dt>` caption style (small caps, `--ink-quiet`), `<dd>` body `--ink`.
+- Map: `<iframe src="https://www.google.com/maps?q=...&output=embed">` 280px height, 8px border-radius.
+
+### Sales section (proposal-only)
+- Full-bleed `--accent-quiet` background visually marking it as the sales chrome.
+- Contains: caption "Draft preview", h2 "Want to publish this site for [Business]?", then diagnosis bullets, pricing, accept form.
+- Max-width 640px container inside.
 
 ### Pricing
 - Single block, no card. Tier label in caption style (small caps `--ink-quiet`) above the price.
@@ -137,4 +154,4 @@ Minimal. The page is read, not navigated.
 - No "trusted by" logo strips, no fabricated stat counters, no countdown timers, no chatbot bubbles.
 - No `background-clip: text` gradient text anywhere.
 - No emoji used as a UI element (icons must be SVG).
-- No images of people or businesses (we have no photo budget per lead).
+- Hero image and CTA button required. Image sourced from Unsplash per vertical using `hero.imageQuery`. No stock photos of people directly addressing the camera (no "smiling dentist", no "happy customer facing lens"). Aim for interior/exterior spaces, professional environments, or tools of the trade.

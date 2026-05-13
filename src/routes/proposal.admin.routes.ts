@@ -98,13 +98,22 @@ export default async function proposalAdminRoutes(app: FastifyInstance) {
 
       // For deployed proposals, show the live site (no sales chrome).
       // For all other reviewable statuses (draft/approved/accepted/paid), show the proposal view.
+      const leadForRenderer = {
+        businessName:      proposal.lead.businessName,
+        phone:             (proposal.lead as unknown as { phone?: string | null }).phone ?? null,
+        email:             (proposal.lead as unknown as { email?: string | null }).email ?? null,
+        googleRating:      (proposal.lead as unknown as { googleRating?: number | null }).googleRating ?? null,
+        googleReviewCount: (proposal.lead as unknown as { googleReviewCount?: number | null }).googleReviewCount ?? null,
+        category:          (proposal.lead as unknown as { category?: string | null }).category ?? null,
+      };
+
       const html = proposal.status === 'deployed'
-        ? renderLiveSite({
-            lead: { businessName: proposal.lead.businessName },
+        ? await renderLiveSite({
+            lead: leadForRenderer,
             content: proposal.content as unknown as SiteContent,
           })
-        : renderProposalView({
-            lead: { businessName: proposal.lead.businessName },
+        : await renderProposalView({
+            lead: leadForRenderer,
             proposal: {
               token: proposal.token,
               finalTier: (proposal.finalTier ?? null) as Tier | null,
