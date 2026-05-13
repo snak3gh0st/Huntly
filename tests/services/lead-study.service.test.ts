@@ -4,15 +4,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 /*  Mocks — must be declared before module imports                      */
 /* ------------------------------------------------------------------ */
 
-const mockCallAIWithProvider = vi.fn<(...args: unknown[]) => Promise<string>>();
+const mockCallAnthropicVision = vi.fn<(...args: unknown[]) => Promise<string>>();
 const mockCrawlWebsite = vi.fn();
+const mockCaptureScreenshot = vi.fn().mockResolvedValue(null);
 
 vi.mock('../../src/lib/ai.js', () => ({
-  callAIWithProvider: (...args: unknown[]) => mockCallAIWithProvider(...args),
+  callAnthropicVision: (...args: unknown[]) => mockCallAnthropicVision(...args),
 }));
 
 vi.mock('../../src/services/crawler.service.js', () => ({
   crawlWebsite: (...args: unknown[]) => mockCrawlWebsite(...args),
+}));
+
+vi.mock('../../src/lib/screenshot.js', () => ({
+  captureScreenshot: (...args: unknown[]) => mockCaptureScreenshot(...args),
 }));
 
 import {
@@ -151,14 +156,13 @@ describe('studyLead', () => {
 
   it('calls crawlWebsite when websiteUrl is set and feeds result to AI', async () => {
     mockCrawlWebsite.mockResolvedValue(VALID_CRAWL_RESULT);
-    mockCallAIWithProvider.mockResolvedValue(JSON.stringify(VALID_STUDY));
+    mockCallAnthropicVision.mockResolvedValue(JSON.stringify(VALID_STUDY));
 
     await studyLead(BASE_INPUT);
 
     expect(mockCrawlWebsite).toHaveBeenCalledWith(BASE_INPUT.websiteUrl);
-    expect(mockCallAIWithProvider).toHaveBeenCalledTimes(1);
-    const [provider, opts] = mockCallAIWithProvider.mock.calls[0]!;
-    expect(provider).toBe('anthropic');
+    expect(mockCallAnthropicVision).toHaveBeenCalledTimes(1);
+    const [opts] = mockCallAnthropicVision.mock.calls[0]!;
     expect((opts as { json: boolean }).json).toBe(true);
     // The user prompt should include crawled content
     expect((opts as { userPrompt: string }).userPrompt).toContain('CRAWLED WEBSITE CONTENT');
@@ -166,7 +170,7 @@ describe('studyLead', () => {
 
   it('does not call crawlWebsite when no websiteUrl provided', async () => {
     const inputNoUrl = { ...BASE_INPUT, websiteUrl: undefined };
-    mockCallAIWithProvider.mockResolvedValue(JSON.stringify(VALID_STUDY));
+    mockCallAnthropicVision.mockResolvedValue(JSON.stringify(VALID_STUDY));
 
     await studyLead(inputNoUrl);
 
@@ -175,21 +179,21 @@ describe('studyLead', () => {
 
   it('sets hasWebsite=false path in prompt when crawler fails', async () => {
     mockCrawlWebsite.mockRejectedValue(new Error('Connection timeout'));
-    mockCallAIWithProvider.mockResolvedValue(JSON.stringify(VALID_STUDY));
+    mockCallAnthropicVision.mockResolvedValue(JSON.stringify(VALID_STUDY));
 
     await studyLead(BASE_INPUT);
 
     // crawlWebsite was attempted but failed
     expect(mockCrawlWebsite).toHaveBeenCalled();
     // AI was still called — with "no website content available" message
-    expect(mockCallAIWithProvider).toHaveBeenCalledTimes(1);
-    const [, opts] = mockCallAIWithProvider.mock.calls[0]!;
+    expect(mockCallAnthropicVision).toHaveBeenCalledTimes(1);
+    const [opts] = mockCallAnthropicVision.mock.calls[0]!;
     expect((opts as { userPrompt: string }).userPrompt).toContain('No website content available');
   });
 
   it('returns validated LeadStudy on success', async () => {
     mockCrawlWebsite.mockResolvedValue(VALID_CRAWL_RESULT);
-    mockCallAIWithProvider.mockResolvedValue(JSON.stringify(VALID_STUDY));
+    mockCallAnthropicVision.mockResolvedValue(JSON.stringify(VALID_STUDY));
 
     const result = await studyLead(BASE_INPUT);
 
@@ -199,16 +203,16 @@ describe('studyLead', () => {
 
   it('retries once when first response is invalid JSON', async () => {
     mockCrawlWebsite.mockResolvedValue(VALID_CRAWL_RESULT);
-    mockCallAIWithProvider
+    mockCallAnthropicVision
       .mockResolvedValueOnce('not json at all')
       .mockResolvedValueOnce(JSON.stringify(VALID_STUDY));
 
     const result = await studyLead(BASE_INPUT);
 
     expect(result.business.targetCustomers).toBeTruthy();
-    expect(mockCallAIWithProvider).toHaveBeenCalledTimes(2);
+    expect(mockCallAnthropicVision).toHaveBeenCalledTimes(2);
     // Second call should include the validation error
-    const [, secondOpts] = mockCallAIWithProvider.mock.calls[1]!;
+    const [secondOpts] = mockCallAnthropicVision.mock.calls[1]!;
     expect((secondOpts as { systemPrompt: string }).systemPrompt).toMatch(/previous response failed validation/i);
   });
 
@@ -218,22 +222,22 @@ describe('studyLead', () => {
       currentSite: { ...VALID_STUDY.currentSite, weaknesses: ['only one'] }, // < 3
     };
     mockCrawlWebsite.mockResolvedValue(VALID_CRAWL_RESULT);
-    mockCallAIWithProvider
+    mockCallAnthropicVision
       .mockResolvedValueOnce(JSON.stringify(badStudy))
       .mockResolvedValueOnce(JSON.stringify(VALID_STUDY));
 
     const result = await studyLead(BASE_INPUT);
     expect(result.currentSite.weaknesses.length).toBeGreaterThanOrEqual(3);
-    expect(mockCallAIWithProvider).toHaveBeenCalledTimes(2);
+    expect(mockCallAnthropicVision).toHaveBeenCalledTimes(2);
   });
 
   it('throws after two validation failures', async () => {
     mockCrawlWebsite.mockResolvedValue(VALID_CRAWL_RESULT);
-    mockCallAIWithProvider
+    mockCallAnthropicVision
       .mockResolvedValueOnce('bad 1')
       .mockResolvedValueOnce('bad 2');
 
     await expect(studyLead(BASE_INPUT)).rejects.toThrow(/failed validation twice/i);
-    expect(mockCallAIWithProvider).toHaveBeenCalledTimes(2);
+    expect(mockCallAnthropicVision).toHaveBeenCalledTimes(2);
   });
 });
