@@ -199,6 +199,11 @@ model ProposalDraft {
   content         Json            @default("{}")
   suggestedTier   String?         @map("suggested_tier")
   finalTier       String?         @map("final_tier")
+  // New segment × difficulty pricing model (see PRODUCT.md "Pricing Model").
+  // Kept alongside the legacy *Tier fields above for backward compatibility.
+  segmentIndustry String?         @map("segment_industry")
+  segmentSize     String?         @map("segment_size")
+  difficulty      Float?
   priceCents      Int?            @map("price_cents")
   paymentLinkUrl  String?         @map("payment_link_url")
   acceptedName    String?         @map("accepted_name")
