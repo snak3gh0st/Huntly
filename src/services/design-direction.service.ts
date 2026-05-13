@@ -33,12 +33,12 @@ export type SectionType = typeof SECTION_TYPES[number];
 export const DesignDirectionSchema = z.object({
   sectionsInOrder: z.array(z.object({
     type: z.enum(SECTION_TYPES),
-    rationale: z.string().min(1).max(300),
-    designNote: z.string().min(1).max(400),
-    contentEmphasis: z.string().min(1).max(300),
+    rationale: z.string().min(1).max(500),
+    designNote: z.string().min(1).max(700),
+    contentEmphasis: z.string().min(1).max(500),
   })).min(5).max(10),
-  microcopyDirection: z.string().min(1).max(400),
-  signatureMoves: z.array(z.string().min(1).max(220)).min(2).max(4),
+  microcopyDirection: z.string().min(1).max(700),
+  signatureMoves: z.array(z.string().min(1).max(450)).min(2).max(4),
 });
 
 export type DesignDirection = z.infer<typeof DesignDirectionSchema>;
