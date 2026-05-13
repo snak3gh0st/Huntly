@@ -11,7 +11,7 @@ import { pickVisualSystem } from '../services/visual-system.service.js';
 import { designDirection } from '../services/design-direction.service.js';
 import { generateHeroImage, buildHeroImagePrompt, buildAboutImagePrompt, buildFeaturedServiceImagePrompt, buildCtaBannerImagePrompt } from '../lib/dalle.js';
 import { critiquePass } from '../services/critique-pass.service.js';
-import { suggestTier } from '../lib/pricing-tiers.js';
+import { suggestTier, suggestSegment } from '../lib/pricing-tiers.js';
 import type { Prisma } from '@prisma/client';
 
 const connection = redis as unknown as ConnectionOptions;
@@ -120,6 +120,11 @@ export async function runProposalJob(data: ProposalJobData): Promise<void> {
       ),
     };
 
+    const suggested = suggestSegment({
+      category: lead.category,
+      googleReviewCount: lead.googleReviewCount,
+    });
+
     await proposalRepo.update(data.proposalId, {
       status: 'draft',
       // Store all layers. Renderer reads SiteContent fields + _study/_strategy/_visualSystem.
@@ -134,6 +139,8 @@ export async function runProposalJob(data: ProposalJobData): Promise<void> {
         ...enrichedContent,
       } as unknown as Prisma.InputJsonValue,
       suggestedTier: suggestTier(lead.googleReviewCount),
+      segmentIndustry: suggested.industry,
+      segmentSize: suggested.size,
       generationError: null,
     });
   } catch (err) {
