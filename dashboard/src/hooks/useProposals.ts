@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Proposal, Tier } from '../types/proposal';
+import type { Proposal, Tier, SizeBand, PricingMatrixResponse } from '../types/proposal';
 
 const apiKey = () => localStorage.getItem('huntly_api_key') ?? '';
 
@@ -54,14 +54,31 @@ export function useGenerateProposal() {
   });
 }
 
+export interface PatchProposalBody {
+  finalTier?: Tier;
+  segmentIndustry?: string | null;
+  segmentSize?: SizeBand | null;
+  difficulty?: number | null;
+  paymentLinkUrl?: string | null;
+  content?: unknown;
+}
+
 export function usePatchProposal() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, body }: { id: string; body: { finalTier?: Tier; paymentLinkUrl?: string | null; content?: unknown } }) =>
+    mutationFn: ({ id, body }: { id: string; body: PatchProposalBody }) =>
       api<Proposal>(`/api/proposals/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     onSuccess: (data) => {
       qc.setQueryData(['proposal', data.id], data);
     },
+  });
+}
+
+export function usePricingMatrix() {
+  return useQuery({
+    queryKey: ['pricing-matrix'],
+    queryFn: () => api<PricingMatrixResponse>('/api/pricing/matrix'),
+    staleTime: 5 * 60_000,
   });
 }
 

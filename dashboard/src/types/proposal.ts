@@ -8,6 +8,17 @@ export type ProposalStatus =
   | 'failed';
 
 export type Tier = 'Starter' | 'Pro' | 'Premium';
+export type SizeBand = 'S' | 'M' | 'L';
+
+export interface PriceRange {
+  minCents: number;
+  maxCents: number;
+}
+
+export interface PricingMatrixResponse {
+  matrix: Record<string, Record<SizeBand, PriceRange>>;
+  industries: string[];
+}
 
 export interface Proposal {
   id: string;
@@ -17,6 +28,9 @@ export interface Proposal {
   content: Record<string, unknown>;
   suggestedTier: Tier | null;
   finalTier: Tier | null;
+  segmentIndustry: string | null;
+  segmentSize: SizeBand | null;
+  difficulty: number | null;
   priceCents: number | null;
   paymentLinkUrl: string | null;
   acceptedName: string | null;

@@ -6,6 +6,8 @@ import { makeToken, makeSlug } from '../lib/slug.js';
 import {
   priceForTier,
   priceForSegment,
+  PRICE_MATRIX,
+  KNOWN_INDUSTRIES,
   type Tier,
   type SizeBand,
   type Segment,
@@ -33,6 +35,11 @@ interface GenerateBody {
 
 export default async function proposalAdminRoutes(app: FastifyInstance) {
   app.addHook('onRequest', apiKeyAuth);
+
+  /* GET /api/pricing/matrix — operator UI reads the same matrix the server uses */
+  app.get('/pricing/matrix', async () => {
+    return { matrix: PRICE_MATRIX, industries: KNOWN_INDUSTRIES };
+  });
 
   /* POST /api/leads/:id/proposals — generate */
   app.post<{ Params: { id: string }; Body: GenerateBody }>(
