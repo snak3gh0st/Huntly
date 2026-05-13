@@ -275,12 +275,13 @@ describe('renderProposalView', () => {
     expect(html).toContain('pricing-currency');
   });
 
-  it('renders sales section with diamond glyph and bordered pricing card', async () => {
+  it('renders sales section with diamond glyph and pricing block', async () => {
     const html = await renderProposalView({ lead: LEAD, proposal: PROPOSAL, content: CONTENT });
     expect(html).toContain('class="sales-section"');
     expect(html).toContain('id="accept-form"');
     expect(html).toContain('sales-caption-mark');
-    expect(html).toContain('sales-pricing-card');
+    // Pricing is a flat block with a hairline rule, not a nested card (DESIGN.md: "Single block, no card")
+    expect(html).toContain('sales-pricing-block');
   });
 
   it('renders accept-form action with token', async () => {

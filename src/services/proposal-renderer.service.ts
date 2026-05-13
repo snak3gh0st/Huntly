@@ -248,13 +248,17 @@ function renderServices(content: RichContent): string {
   if (services.length === 0) return '';
 
   const featured = services[0];
+  // No boxed chip — DESIGN.md bans "icons inside boxed chips on the services section"
+  // Featured service uses the same numeral treatment as supporting rows for visual unity
   const featuredHtml = `<div class="service-featured">
-  <div class="service-icon-wrap" aria-hidden="true">${ICON_SVG[featured.icon]}</div>
-  <h3 class="service-featured-title">${escapeHtml(featured.title)}</h3>
-  <details class="service-details">
-    <summary class="service-summary">About this service</summary>
-    <p class="service-details-body">${escapeHtml(featured.description)}</p>
-  </details>
+  <span class="service-featured-num" aria-hidden="true">01</span>
+  <div class="service-featured-body">
+    <h3 class="service-featured-title">${escapeHtml(featured.title)}</h3>
+    <details class="service-details">
+      <summary class="service-summary">About this service</summary>
+      <p class="service-details-body">${escapeHtml(featured.description)}</p>
+    </details>
+  </div>
 </div>`;
 
   const supporting = services.slice(1)
@@ -427,13 +431,15 @@ function renderSalesSection(
   const pricing = renderPricing(content, proposal);
   const ctaForm = renderCtaForm(content, proposal);
 
+  // No nested card wrapper — DESIGN.md: "Single block, no card" for pricing.
+  // Nested cards on an already-tinted sales section background violates impeccable design laws.
   return `
 <section class="sales-section" id="accept-form">
   <div class="sales-inner">
     <p class="sales-caption"><span class="sales-caption-mark" aria-hidden="true">&#9670;</span> Draft preview</p>
-    <h2 class="sales-heading">Want to publish this site for ${escapeHtml(lead.businessName)}?</h2>
+    <h2 class="sales-heading">Want to publish this site for <em class="sales-heading-name">${escapeHtml(lead.businessName)}</em>?</h2>
     ${diagnosis}
-    <div class="sales-pricing-card">
+    <div class="sales-pricing-block">
       ${pricing}
     </div>
     ${ctaForm}

@@ -307,14 +307,14 @@
     }
 
     .hero-rule {
-      width: 32px;
+      width: 56px;
       border: none;
-      border-top: 1px solid var(--ink-quiet);
+      border-top: 1.5px solid var(--ink-quiet);
       margin-bottom: 1.125rem;
     }
 
     .hero-bg:not(.hero-no-image) .hero-rule {
-      border-top-color: rgba(255,255,255,0.4);
+      border-top-color: rgba(255,255,255,0.45);
     }
 
     .hero-name {
@@ -487,12 +487,26 @@
       padding-block: 5rem;
     }
 
+    /* Intentionally varied rhythm — not uniform 5rem everywhere */
+    .services-inner        { padding-block: 6rem; }
+    .testimonials-section .section-inner { padding-block: 7rem; }
+    .what-changes-section .section-inner { padding-block: 4.5rem; }
+    .contact-section .section-inner      { padding-block: 4.5rem; }
+
     .section-caption {
       font-size: 0.75rem;
       font-weight: 500;
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: var(--ink-quiet);
+    }
+
+    /* Services section caption hangs into the gutter on wide viewports —
+       one intentional alignment break to signal designed, not templated  */
+    @media (min-width: 1060px) {
+      .services-inner .section-caption {
+        margin-left: -2rem;
+      }
     }
 
     .section-heading {
@@ -507,28 +521,30 @@
     /* ── Services section ─────────────────────────────── */
     .services-section { background: var(--surface); }
 
+    /* Featured service (01) — numbered like supporting rows, no boxed chip */
     .service-featured-wrap { margin-top: 2rem; }
 
     .service-featured {
+      display: flex;
+      gap: 2rem;
+      align-items: flex-start;
       padding: 2.25rem 0;
       border-top: 1px solid var(--border);
       border-bottom: 1px solid var(--border);
     }
 
-    .service-featured .service-icon-wrap {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      background: var(--accent-quiet);
-      color: var(--accent);
+    .service-featured-num {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: clamp(2rem, 4vw, 3rem);
+      line-height: 0.9;
+      color: var(--ink-quiet);
       flex-shrink: 0;
-      margin-bottom: 1rem;
+      letter-spacing: -0.02em;
+      min-width: 2.5rem;
     }
 
-    .service-featured .service-icon-wrap svg { width: 20px; height: 20px; }
+    .service-featured-body { flex: 1; }
 
     .service-featured-title {
       font-family: var(--font-display);
@@ -669,7 +685,7 @@
     .testimonial-item { display: flex; flex-direction: column; gap: 0.875rem; }
 
     .testimonial-stars {
-      color: var(--accent);
+      color: var(--ink-quiet);
       font-size: 1rem;
       letter-spacing: 0.1em;
     }
