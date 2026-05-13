@@ -153,7 +153,15 @@ export function buildSystemPrompt(study?: LeadStudy, strategy?: Strategy): strin
 You have been given a structured Study (Layer 1) and Strategy (Layer 2) for this lead.
 Study summary:
 - Current site has website: ${study.currentSite.hasWebsite}
-- Design assessment: ${study.currentSite.designAssessment}
+- Design era: ${study.currentSite.designAudit.era}
+- Design hierarchy issues: ${study.currentSite.designAudit.hierarchy}
+- Layout failures: ${study.currentSite.designAudit.layoutFailures.join('; ')}
+- Copy headline: ${study.currentSite.copyAudit.headline}
+- CTA quality: ${study.currentSite.copyAudit.ctaQuality}
+- Weasel words found: ${study.currentSite.copyAudit.weasel_words.join(', ')}
+- Missing messaging: ${study.currentSite.copyAudit.missingMessaging.join('; ')}
+- Trust gaps: ${study.currentSite.conversionAudit.trustGaps.join('; ')}
+- Conversion booking flow: ${study.currentSite.conversionAudit.bookingFlow}
 - Key weaknesses: ${study.currentSite.weaknesses.join('; ')}
 - Missing features: ${study.currentSite.missingFeatures.join('; ')}
 - Copy tone now: ${study.currentSite.copyToneNow}
@@ -220,7 +228,7 @@ Rules:
 18. STUDY + STRATEGY ARE THE FOUNDATION. When a Study and Strategy are provided (see the section above), EVERY field you generate must trace back to these documents:
     - \`brand.tagline\` and \`brand.description\` must reflect the Strategy's \`heroAngle\` and copyTone.
     - \`brand.manifesto\` must crystallize the Strategy's \`manifestoSeed\` into one strong sentence.
-    - \`diagnosis.bullets\` must come from the Study's \`currentSite.weaknesses\` and Strategy's \`conversionOpportunities.gap\`. Each bullet's \`evidence\` is the customer language or specific gap, not generic.
+    - \`diagnosis.bullets\` must come from the Study's \`currentSite.designAudit.layoutFailures\`, \`copyAudit.weasel_words\`, \`conversionAudit.trustGaps\`, \`currentSite.weaknesses\`, and Strategy's \`conversionOpportunities.gap\`. Each bullet's \`evidence\` is the concrete observation from the forensic audit — quote specific failures (e.g. "Hero headline reads 'Your trusted partner since 2010' — a phrase that matches zero actual customer motivations") not generic copy.
     - \`services\` must come from the Study's \`business.actualServices\` — these are the lead's REAL services as evidenced by their site/reviews, not invented.
     - \`testimonials\` may include short snippets from the Study's \`voice.customerLanguage\` arrays.
     - \`hero.eyebrow\` references the Study's \`business.locationContext\`.
@@ -407,7 +415,10 @@ Location: ${study.business.locationContext}
 Customer language: ${study.voice.customerLanguage.join('; ')}
 Key pain points: ${study.voice.keyPainPoints.join('; ')}
 Key aspirations: ${study.voice.keyAspirations.join('; ')}
-Design assessment: ${study.currentSite.designAssessment}
+Design era: ${study.currentSite.designAudit.era}
+Layout failures: ${study.currentSite.designAudit.layoutFailures.join('; ')}
+Weasel words: ${study.currentSite.copyAudit.weasel_words.join(', ')}
+Trust gaps: ${study.currentSite.conversionAudit.trustGaps.join('; ')}
 Current weaknesses: ${study.currentSite.weaknesses.join('; ')}
 Missing features: ${study.currentSite.missingFeatures.join('; ')}
 Hero angle: ${strategy.heroAngle}

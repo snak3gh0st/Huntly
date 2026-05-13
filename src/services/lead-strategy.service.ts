@@ -44,9 +44,9 @@ Schema:
 
 Rules:
 1. HERO ANGLE — this is the single most important sentence. It must be specific to THIS business, grounded in the study's uniqueAngles and locationContext. BANNED phrases in heroAngle: "quality you can trust", "committed to excellence", "attention to detail", "trusted partner", "dedicated to", "passionate about", any generic affirmation.
-2. CONVERSION OPPORTUNITIES — every "gap" must reference a specific weakness from the study's currentSite.weaknesses or missingFeatures. No generic gaps. 3 to 5 items required.
+2. CONVERSION OPPORTUNITIES — every "gap" must reference a specific weakness from the study's currentSite.weaknesses, conversionAudit.trustGaps, or copyAudit.missingMessaging. No generic gaps. 3 to 5 items required. When trustGaps and missingMessaging are available, prefer those — they are the most concrete evidence of conversion failures.
 3. COPY TONE — must reference the actual language patterns from the study's voice.customerLanguage, not generic descriptors like "professional and friendly". Base it on how their customers actually talk.
-4. DESIGN PRIORITIES — ordered by business impact. Ground each in the study's designAssessment or missingFeatures.
+4. DESIGN PRIORITIES — ordered by business impact. Ground each in the study's designAudit (era, hierarchy, layoutFailures) or conversionAudit (trustGaps, bookingFlow) — not generic observations.
 5. MANIFESTO SEED — a single compelling line that captures the core brand promise. Layer 3 will refine this into a one-sentence manifesto.
 6. All string fields must respect their character limits — count carefully.
 7. Return ONLY the JSON object.`;

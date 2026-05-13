@@ -14,10 +14,44 @@ export const LeadStudySchema = z.object({
     domain: z.string().nullable(),
     extractedHeadlines: z.array(z.string().max(200)).max(10),
     extractedServices: z.array(z.string().max(120)).max(15),
-    designAssessment: z.string().min(1).max(800),
-    weaknesses: z.array(z.string().max(200)).min(3).max(7),
-    missingFeatures: z.array(z.string().max(120)).min(2).max(6),
-    copyToneNow: z.string().min(1).max(200),
+
+    // Structured design audit — replaces the former single designAssessment string
+    designAudit: z.object({
+      era:              z.string().max(200),
+      hierarchy:        z.string().max(300),
+      typography:       z.string().max(300),
+      colorPalette:     z.string().max(200),
+      layoutFailures:   z.array(z.string().max(250)).min(0).max(6),
+      imageryQuality:   z.string().max(200),
+      whitespaceUsage:  z.string().max(200),
+      mobileImpression: z.string().max(200),
+      accessibility:    z.array(z.string().max(250)).min(0).max(5),
+    }),
+
+    // Structured copy audit
+    copyAudit: z.object({
+      headline:          z.string().max(250),
+      ctaQuality:        z.string().max(250),
+      voiceConsistency:  z.string().max(250),
+      weasel_words:      z.array(z.string().max(120)).max(5),
+      missingMessaging:  z.array(z.string().max(250)).min(0).max(5),
+    }),
+
+    // Structured conversion audit
+    conversionAudit: z.object({
+      primaryCtaPresent:   z.boolean(),
+      primaryCtaLocation:  z.string().max(200),
+      secondaryCtaPresent: z.boolean(),
+      trustSignals:        z.array(z.string().max(200)).max(8),
+      trustGaps:           z.array(z.string().max(250)).min(0).max(6),
+      formPresent:         z.boolean(),
+      bookingFlow:         z.string().max(200),
+    }),
+
+    // Kept for downstream backward compat — aggregations of the deeper audits above
+    weaknesses: z.array(z.string().max(250)).min(3).max(7),
+    missingFeatures: z.array(z.string().max(200)).min(2).max(6),
+    copyToneNow: z.string().min(1).max(250),
   }),
   business: z.object({
     actualServices: z.array(z.string().max(120)).min(2).max(10),
@@ -39,10 +73,22 @@ export type LeadStudy = z.infer<typeof LeadStudySchema>;
 /* ------------------------------------------------------------------ */
 
 function buildStudySystemPrompt(): string {
-  return `You are a forensic investigator analyzing a small business's current online presence to inform a website rebuild.
+  return `You are doing a senior-designer-level forensic audit of a small business's online presence. You have:
+- A screenshot of their current website (visual evidence, when provided)
+- Crawled content from their site (HTML text, headings, services listed)
+- Their Google reviews data (when available)
+- Their business basics
 
-You will receive their current website's content (if available) plus their Google reviews and enrichment data.
-You may also receive a screenshot of the lead's current website as an image. If you do, analyze the visual style — name the design era specifically (e.g. "2015-era Bootstrap", "late-2000s template", "WordPress default"), describe the color palette ("navy + gold, lots of stock photography"), call out specific layout failures ("hero is a 400px stock image with no headline above the fold"). Feed these observations into currentSite.designAssessment and currentSite.weaknesses. Be specific — vague assessments like "dated design" are not useful.
+Your audit must be CONCRETE and EVIDENCE-BASED. Never say "it could be improved" — say WHAT specifically fails and WHY. Never say "the design is dated" — say "the layout uses a 2015-era Bootstrap navbar with default blue accents, body text is set in Arial at 14px, and the hero is a 400px stock photo with overlaid text that does not meet 4.5:1 contrast." Use what the screenshot shows literally.
+
+For each section of the audit (designAudit, copyAudit, conversionAudit):
+- Be specific and concrete
+- Reference what you SEE (not what you imagine)
+- If you cannot tell from the data, say so honestly — do not invent
+- For weasel_words, quote actual phrases visible in the screenshot or crawled HTML
+- For trustGaps, list what is MISSING that a senior designer would expect for this vertical (e.g. "no Better Business Bureau accreditation badge", "no specific years-in-business statement", "no team photos")
+
+The audit drives every downstream layer. Be exhaustive, be specific, never invent.
 
 Output STRICT JSON ONLY matching this schema. No markdown. No prose around the JSON. No comments.
 
@@ -51,29 +97,55 @@ Schema:
   "currentSite": {
     "hasWebsite": boolean,
     "domain": string | null,
-    "extractedHeadlines": string[]   // h1/h2/hero copy directly from their site, max 10 items, each <=200 chars
-    "extractedServices": string[]    // services they explicitly list on their site, max 15 items, each <=120 chars
-    "designAssessment": string,      // 2-5 sentences on the design quality, era, color palette, layout issues — up to 800 chars; more specific when screenshot provided
-    "weaknesses": string[],          // 3 to 7 specific weaknesses grounded in the crawled content or absence of it
-    "missingFeatures": string[],     // 2 to 6 features absent from their site (booking, chat, social embeds, mobile UX, etc.)
-    "copyToneNow": string            // 1 sentence describing current copy tone, <=200 chars
+    "extractedHeadlines": string[],   // h1/h2/hero copy directly from their site, max 10 items, each <=200 chars
+    "extractedServices": string[],    // services they explicitly list on their site, max 15 items, each <=120 chars
+    "designAudit": {
+      "era": string,                  // e.g. "Late-2000s template", "2015 Bootstrap", "Modern but generic" — <=200 chars
+      "hierarchy": string,            // e.g. "No clear visual hierarchy; H1 is barely larger than body" — <=300 chars
+      "typography": string,           // e.g. "Generic sans-serif body; no display type moments" — <=300 chars
+      "colorPalette": string,         // e.g. "Default blue + gray; no brand color" — <=200 chars
+      "layoutFailures": string[],     // 0 to 6 specific layout failures, each <=250 chars
+      "imageryQuality": string,       // e.g. "Stock photography of generic professionals; no real photos of the business" — <=200 chars
+      "whitespaceUsage": string,      // e.g. "Cramped; sections butt against each other" — <=200 chars
+      "mobileImpression": string,     // e.g. "Appears to be desktop-first; mobile layout unknown from screenshot" — <=200 chars
+      "accessibility": string[]       // 0 to 5 a11y issues, e.g. "Body contrast looks below 4.5:1", "Low-contrast CTAs" — each <=250 chars
+    },
+    "copyAudit": {
+      "headline": string,             // What their current hero/headline says + a critique — <=250 chars
+      "ctaQuality": string,           // CTA presence + quality, e.g. "Generic 'Contact Us'; no specific value prop" — <=250 chars
+      "voiceConsistency": string,     // <=250 chars
+      "weasel_words": string[],       // 0 to 5 actual phrases used, e.g. "your trusted partner", "exceeding expectations"
+      "missingMessaging": string[]    // 0 to 5 value props or proof points they SHOULD be saying but are not, each <=250 chars
+    },
+    "conversionAudit": {
+      "primaryCtaPresent": boolean,
+      "primaryCtaLocation": string,   // <=200 chars
+      "secondaryCtaPresent": boolean,
+      "trustSignals": string[],       // 0 to 8 trust signals that ARE present, each <=200 chars
+      "trustGaps": string[],          // 0 to 6 trust signals that are MISSING, each <=250 chars
+      "formPresent": boolean,
+      "bookingFlow": string           // e.g. "No booking; phone-only contact" or "Calendly widget on contact page" — <=200 chars
+    },
+    "weaknesses": string[],           // 3 to 7 specific weaknesses (aggregation of the audits above for downstream compat)
+    "missingFeatures": string[],      // 2 to 6 features absent from their site (aggregation for downstream compat)
+    "copyToneNow": string             // 1 sentence describing current copy tone — <=250 chars
   },
   "business": {
-    "actualServices": string[],      // 2 to 10 services evidenced by their site or reviews, each <=120 chars
-    "targetCustomers": string,       // 1-2 sentences: who they serve, <=300 chars
-    "uniqueAngles": string[],        // 2 to 5 things that genuinely set them apart, each <=200 chars
-    "locationContext": string        // city/region context relevant to the website copy, <=300 chars
+    "actualServices": string[],       // 2 to 10 services evidenced by their site or reviews, each <=120 chars
+    "targetCustomers": string,        // 1-2 sentences: who they serve, <=300 chars
+    "uniqueAngles": string[],         // 2 to 5 things that genuinely set them apart, each <=200 chars
+    "locationContext": string         // city/region context relevant to the website copy, <=300 chars
   },
   "voice": {
-    "customerLanguage": string[],    // phrases customers actually use in reviews (direct quotes or close paraphrases), max 6, each <=200 chars
-    "keyPainPoints": string[],       // frustrations customers mention in reviews, max 6, each <=200 chars
-    "keyAspirations": string[]       // what customers want from this business, max 6, each <=200 chars
+    "customerLanguage": string[],     // phrases customers actually use in reviews (direct quotes or close paraphrases), max 6, each <=200 chars
+    "keyPainPoints": string[],        // frustrations customers mention in reviews, max 6, each <=200 chars
+    "keyAspirations": string[]        // what customers want from this business, max 6, each <=200 chars
   }
 }
 
 Rules:
 - Be specific and evidence-based. Never invent weaknesses or missing features without grounding in the data provided.
-- Where evidence is missing: set "hasWebsite": false if no crawl data; leave arrays at their minimum length.
+- Where evidence is missing: set "hasWebsite": false if no crawl data; leave arrays at their minimum length (0 for arrays with no minimum).
 - "weaknesses" must be specific to THIS business's site, not generic observations.
 - "extractedHeadlines" must be copied verbatim (or very close) from the crawled content — not invented.
 - "extractedServices" must reflect services the business explicitly lists, not inferred guesses.
@@ -167,7 +239,8 @@ export async function studyLead(input: GeneratorInput): Promise<LeadStudy> {
 
       if (crawlResult.homepageText) {
         hasWebsite = true;
-        parts.push(`--- PAGE TEXT (truncated) ---\n${crawlResult.homepageText.slice(0, 6000)}`);
+        // First 4000 chars surfaced explicitly for forensic copy audit
+        parts.push(`--- HOMEPAGE TEXT (first 4000 chars) ---\n${crawlResult.homepageText.slice(0, 4000)}`);
       }
 
       if (crawlResult.headings.length > 0) {

@@ -66,7 +66,47 @@ const VALID_STUDY: LeadStudy = {
     domain: 'hmdcpa.example',
     extractedHeadlines: ['Tax Preparation', 'Bookkeeping Services'],
     extractedServices: ['Tax preparation', 'Bookkeeping', 'Financial advisory'],
-    designAssessment: 'Dated Bootstrap template with minimal visual hierarchy and no clear conversion path.',
+    designAudit: {
+      era: '2015-era Bootstrap template with default blue navbar and no custom branding.',
+      hierarchy: 'No clear visual hierarchy; H1 is barely larger than body text and shares the same weight.',
+      typography: 'Arial body text at 14px; no display type moments; all headings in the same sans-serif.',
+      colorPalette: 'Default Bootstrap blue + gray; no brand color; no warmth in the palette.',
+      layoutFailures: [
+        'Hero is a 400px stock photo with overlaid text that does not meet 4.5:1 contrast.',
+        'Services listed as a plain ul with no visual differentiation.',
+      ],
+      imageryQuality: 'Stock photography of generic office workers; no photos of the actual business or Henry.',
+      whitespaceUsage: 'Cramped; sections stack with minimal padding and no breathing room between them.',
+      mobileImpression: 'Appears to be desktop-first; the navbar collapses but the hero image is clipped on mobile.',
+      accessibility: [
+        'Body contrast appears below 4.5:1 on the light-gray background.',
+        'CTA button has no focus-visible state visible in the screenshot.',
+      ],
+    },
+    copyAudit: {
+      headline: 'Hero reads "HMD CPA — Trusted Accounting Services in Dallas" — generic, could apply to any CPA firm.',
+      ctaQuality: 'Single "Contact Us" link in the footer; no primary CTA button visible above the fold.',
+      voiceConsistency: 'Inconsistent: formal brochure language in the hero, then informal bullet points on the services page.',
+      weasel_words: ['trusted accounting services', 'committed to excellence', 'your financial success'],
+      missingMessaging: [
+        'No mention of response speed despite 8 reviewers citing slow communication.',
+        'No statement of specialization in small business tax — the strongest unique angle.',
+      ],
+    },
+    conversionAudit: {
+      primaryCtaPresent: false,
+      primaryCtaLocation: 'No primary CTA visible above the fold; only a footer contact link.',
+      secondaryCtaPresent: false,
+      trustSignals: ['Google Maps embed on contact page', 'Professional headshot of Henry on About page'],
+      trustGaps: [
+        'No Google review count or star rating displayed on the site.',
+        'No years-in-business statement despite long tenure.',
+        'No client testimonials or case studies.',
+        'No BBB or professional accreditation badge.',
+      ],
+      formPresent: false,
+      bookingFlow: 'Phone-only contact; no online scheduling or intake form.',
+    },
     weaknesses: [
       'No online scheduling — clients must call to book appointments',
       'Generic hero text that could apply to any CPA firm',

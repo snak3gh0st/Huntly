@@ -162,7 +162,33 @@ const STUDY_FIXTURE: LeadStudy = {
     domain: 'smilefamilydental.example',
     extractedHeadlines: ['Family Dental Care in Austin'],
     extractedServices: ['Cleanings', 'Checkups', 'Whitening', 'Emergency care'],
-    designAssessment: 'Dated 2015-era Bootstrap template with stock photography.',
+    designAudit: {
+      era: '2015-era Bootstrap template with default blue accent colors.',
+      hierarchy: 'No clear visual hierarchy; H1 and body text are nearly the same size.',
+      typography: 'Generic sans-serif throughout; no display font for headings.',
+      colorPalette: 'Default Bootstrap blue + white; no warm brand color.',
+      layoutFailures: ['Hero stock photo has overlaid text with insufficient contrast.', 'Services listed as identical icon cards with no differentiation.'],
+      imageryQuality: 'Stock photography of smiling generic dental patients; no photos of Dr. Silva or the actual clinic.',
+      whitespaceUsage: 'Cramped; sections stack with minimal vertical padding.',
+      mobileImpression: 'Desktop-first; the hero image crops awkwardly on mobile.',
+      accessibility: ['Hero text contrast appears below 4.5:1 over the stock photo.', 'No visible focus states on CTA buttons.'],
+    },
+    copyAudit: {
+      headline: 'Hero reads "Family Dental Care in Austin" — descriptive but not differentiated; no urgency or unique angle.',
+      ctaQuality: 'Only a "Contact Us" link; no appointment booking CTA above the fold.',
+      voiceConsistency: 'Uniform but generic; reads like filler copy that could apply to any dental practice.',
+      weasel_words: ['family dental care', 'committed to your smile', 'quality you can trust'],
+      missingMessaging: ['No mention of same-day emergency appointments despite offering them.', 'No Austin-specific differentiation in any headline.'],
+    },
+    conversionAudit: {
+      primaryCtaPresent: false,
+      primaryCtaLocation: 'No primary CTA above the fold; contact link only in footer.',
+      secondaryCtaPresent: false,
+      trustSignals: ['Google Maps embed on contact page', 'Photo of Dr. Silva on About page'],
+      trustGaps: ['No Google rating displayed.', 'No review count or testimonials above the fold.', 'No years-in-business statement.', 'No insurance-accepted list.'],
+      formPresent: false,
+      bookingFlow: 'Phone-only; no online booking or intake form.',
+    },
     weaknesses: [
       'No online booking — 5 reviewers asked for it',
       'Generic hero text with no Austin-specific differentiation',
@@ -218,7 +244,7 @@ describe('buildSystemPrompt', () => {
   it('includes study + strategy section when both are provided', () => {
     const sys = buildSystemPrompt(STUDY_FIXTURE, STRATEGY_FIXTURE);
     expect(sys).toContain('STUDY AND STRATEGY PROVIDED');
-    expect(sys).toContain(STUDY_FIXTURE.currentSite.designAssessment);
+    expect(sys).toContain(STUDY_FIXTURE.currentSite.designAudit.era);
     expect(sys).toContain(STRATEGY_FIXTURE.heroAngle);
     expect(sys).toContain(STRATEGY_FIXTURE.manifestoSeed);
   });
