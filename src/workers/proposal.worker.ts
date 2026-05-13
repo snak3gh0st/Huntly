@@ -5,6 +5,8 @@ import {
   generateSiteContent,
   type GeneratorInput,
 } from '../services/proposal-generator.service.js';
+import { studyLead } from '../services/lead-study.service.js';
+import { strategize } from '../services/lead-strategy.service.js';
 import { suggestTier } from '../lib/pricing-tiers.js';
 import type { Prisma } from '@prisma/client';
 
@@ -48,10 +50,24 @@ export async function runProposalJob(data: ProposalJobData): Promise<void> {
   };
 
   try {
-    const content = await generateSiteContent(input);
+    // Layer 1 — Study the lead's website and business context
+    const study = await studyLead(input);
+
+    // Layer 2 — Strategize: derive hero angle, conversion opportunities, copy tone
+    const strategy = await strategize(input, study);
+
+    // Layer 3 — Build: generate final site content grounded in study + strategy
+    const siteContent = await generateSiteContent(input, study, strategy);
+
     await proposalRepo.update(data.proposalId, {
       status: 'draft',
-      content: content as unknown as Prisma.InputJsonValue,
+      // Store all three layers. Renderer reads only SiteContent fields;
+      // _study/_strategy are ignored by the renderer but stored for inspection.
+      content: {
+        _study: study,
+        _strategy: strategy,
+        ...siteContent,
+      } as unknown as Prisma.InputJsonValue,
       suggestedTier: suggestTier(lead.googleReviewCount),
       generationError: null,
     });

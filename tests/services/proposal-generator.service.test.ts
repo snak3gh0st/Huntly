@@ -15,6 +15,8 @@ import {
 } from '../../src/services/proposal-generator.service.js';
 
 import { SiteContentSchema } from '../../src/services/proposal-generator.service.js';
+import type { LeadStudy } from '../../src/services/lead-study.service.js';
+import type { Strategy } from '../../src/services/lead-strategy.service.js';
 
 const VALID_CONTENT = {
   brand: { tagline: 'Premier dental care', description: 'A family-run clinic.' },
@@ -154,6 +156,50 @@ const BASE_INPUT: GeneratorInput = {
   operatorNotes: 'Owner mentioned hiring an associate dentist',
 };
 
+const STUDY_FIXTURE: LeadStudy = {
+  currentSite: {
+    hasWebsite: true,
+    domain: 'smilefamilydental.example',
+    extractedHeadlines: ['Family Dental Care in Austin'],
+    extractedServices: ['Cleanings', 'Checkups', 'Whitening', 'Emergency care'],
+    designAssessment: 'Dated 2015-era Bootstrap template with stock photography.',
+    weaknesses: [
+      'No online booking — 5 reviewers asked for it',
+      'Generic hero text with no Austin-specific differentiation',
+      'No social proof visible above the fold',
+    ],
+    missingFeatures: ['Online booking', 'Chat widget', 'Patient portal'],
+    copyToneNow: 'Formal and overly broad; could apply to any dental clinic.',
+  },
+  business: {
+    actualServices: ['Cleanings', 'Annual checkups', 'Whitening', 'Emergency care', 'Sedation dentistry'],
+    targetCustomers: 'Families and adults in Austin looking for a full-service dental provider.',
+    uniqueAngles: ['Same-day emergency appointments', 'Family-friendly environment'],
+    locationContext: 'Austin, TX — competitive dental market with high consumer expectations.',
+  },
+  voice: {
+    customerLanguage: ['Dr. Silva really puts you at ease', 'best dental experience I have had'],
+    keyPainPoints: ['Hard to get appointments', 'Phone goes to voicemail'],
+    keyAspirations: ['Want to book online', 'Need same-day care'],
+  },
+};
+
+const STRATEGY_FIXTURE: Strategy = {
+  heroAngle: 'Austin families get same-day dental care and online booking at Smile Family Dental.',
+  conversionOpportunities: [
+    { gap: 'No online booking — 5 reviewers asked for it', fix: 'Calendly/Zocdoc widget in hero and contact sections' },
+    { gap: 'No social proof above the fold', fix: 'Star rating strip with review count directly under the hero' },
+    { gap: 'Generic hero text with no Austin differentiation', fix: 'Headline anchored in same-day emergency and Austin family focus' },
+  ],
+  copyTone: 'Warm but direct, echoing patient language: "Dr. Silva really puts you at ease." No clinical jargon.',
+  designPriorities: [
+    'Hero CTA for online booking above the fold',
+    'Social proof strip with Google rating',
+    'Services grid with clear specialty callouts',
+  ],
+  manifestoSeed: 'Austin dental care that fits your schedule, not the other way around.',
+};
+
 describe('buildSystemPrompt', () => {
   it('mentions one-time pricing and forbids "per month" phrasing', () => {
     const sys = buildSystemPrompt();
@@ -167,6 +213,24 @@ describe('buildSystemPrompt', () => {
     for (const icon of ['phone', 'calendar', 'globe', 'message', 'clock', 'star']) {
       expect(sys).toContain(icon);
     }
+  });
+
+  it('includes study + strategy section when both are provided', () => {
+    const sys = buildSystemPrompt(STUDY_FIXTURE, STRATEGY_FIXTURE);
+    expect(sys).toContain('STUDY AND STRATEGY PROVIDED');
+    expect(sys).toContain(STUDY_FIXTURE.currentSite.designAssessment);
+    expect(sys).toContain(STRATEGY_FIXTURE.heroAngle);
+    expect(sys).toContain(STRATEGY_FIXTURE.manifestoSeed);
+  });
+
+  it('includes rule 18 referencing Study + Strategy foundation', () => {
+    const sys = buildSystemPrompt(STUDY_FIXTURE, STRATEGY_FIXTURE);
+    expect(sys).toMatch(/STUDY \+ STRATEGY ARE THE FOUNDATION/i);
+  });
+
+  it('does not include study section when no study provided', () => {
+    const sys = buildSystemPrompt();
+    expect(sys).not.toContain('STUDY AND STRATEGY PROVIDED');
   });
 });
 
@@ -194,6 +258,26 @@ describe('buildUserPrompt', () => {
     const u = buildUserPrompt({ ...BASE_INPUT, operatorNotes: undefined });
     expect(u).not.toMatch(/Operator notes:/);
   });
+
+  it('includes study JSON in user prompt when study is provided', () => {
+    const u = buildUserPrompt(BASE_INPUT, STUDY_FIXTURE);
+    expect(u).toContain('STUDY (Layer 1');
+    expect(u).toContain('smilefamilydental.example');
+    expect(u).toContain('Same-day emergency appointments');
+  });
+
+  it('includes strategy JSON in user prompt when strategy is provided', () => {
+    const u = buildUserPrompt(BASE_INPUT, STUDY_FIXTURE, STRATEGY_FIXTURE);
+    expect(u).toContain('STRATEGY (Layer 2');
+    expect(u).toContain(STRATEGY_FIXTURE.heroAngle);
+    expect(u).toContain(STRATEGY_FIXTURE.manifestoSeed);
+  });
+
+  it('omits study/strategy sections when not provided', () => {
+    const u = buildUserPrompt(BASE_INPUT);
+    expect(u).not.toContain('STUDY (Layer 1');
+    expect(u).not.toContain('STRATEGY (Layer 2');
+  });
 });
 
 describe('generateSiteContent', () => {
@@ -215,6 +299,17 @@ describe('generateSiteContent', () => {
     mockCallAIWithProvider.mockResolvedValue(JSON.stringify(VALID_CONTENT));
     const result = await generateSiteContent(BASE_INPUT);
     expect(result.brand.tagline).toBe('Premier dental care');
+  });
+
+  it('passes study + strategy into system and user prompts when provided', async () => {
+    mockCallAIWithProvider.mockResolvedValue(JSON.stringify(VALID_CONTENT));
+    await generateSiteContent(BASE_INPUT, STUDY_FIXTURE, STRATEGY_FIXTURE);
+
+    const [, opts] = mockCallAIWithProvider.mock.calls[0]!;
+    const { systemPrompt, userPrompt } = opts as { systemPrompt: string; userPrompt: string };
+    expect(systemPrompt).toContain('STUDY AND STRATEGY PROVIDED');
+    expect(userPrompt).toContain('STUDY (Layer 1');
+    expect(userPrompt).toContain('STRATEGY (Layer 2');
   });
 });
 

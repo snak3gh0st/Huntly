@@ -10,6 +10,12 @@ export interface CrawlResult {
   hasChatbot: boolean | null;
   hasOnlineBooking: boolean | null;
   techSignals: Record<string, unknown>;
+  /** Visible text from the homepage body, truncated to ~8000 chars. */
+  homepageText: string | null;
+  /** h1/h2 heading texts extracted from the homepage. */
+  headings: string[];
+  /** nav link texts and prominent anchor texts (services-page links etc.). */
+  pageLinks: string[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -56,7 +62,45 @@ function nullResult(): CrawlResult {
     hasChatbot: null,
     hasOnlineBooking: null,
     techSignals: {},
+    homepageText: null,
+    headings: [],
+    pageLinks: [],
   };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Content extraction for Study layer                                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Extract visible body text, trimmed and condensed, capped at maxChars.
+ * Strips script/style/nav/footer elements before extracting.
+ */
+function extractPageText($: cheerio.CheerioAPI, maxChars = 8000): string {
+  // Remove noisy elements before extracting text
+  $('script, style, noscript, svg, iframe, nav, footer, header').remove();
+  const text = $('body').text().replace(/\s+/g, ' ').trim();
+  return text.slice(0, maxChars);
+}
+
+/** Extract h1 and h2 heading texts from the document. */
+function extractHeadings($: cheerio.CheerioAPI): string[] {
+  const found: string[] = [];
+  $('h1, h2').each((_, el) => {
+    const t = $(el).text().replace(/\s+/g, ' ').trim();
+    if (t.length > 0 && t.length <= 200) found.push(t);
+  });
+  return found.slice(0, 15);
+}
+
+/** Extract meaningful nav/anchor link texts (nav, header, priority pages). */
+function extractLinkTexts($: cheerio.CheerioAPI): string[] {
+  const found = new Set<string>();
+  $('nav a, header a, .services a, [class*="menu"] a').each((_, el) => {
+    const t = $(el).text().replace(/\s+/g, ' ').trim();
+    if (t.length > 1 && t.length <= 60) found.add(t);
+  });
+  return [...found].slice(0, 20);
 }
 
 /**
@@ -252,6 +296,16 @@ export async function crawlWebsite(url: string): Promise<CrawlResult> {
       // In production we'd use Playwright here — for now mark as tech signal
       result.techSignals.spaDetected = true;
     }
+
+    // Extract Study-layer content from homepage
+    // Load a fresh cheerio instance so extractPageText() can strip nav/footer
+    // without affecting detectWhatsapp/detectChatbot/detectBooking (which need
+    // the full HTML). extractHeadings and extractLinkTexts must also run on
+    // the unstripped doc.
+    result.headings = extractHeadings($home);
+    result.pageLinks = extractLinkTexts($home);
+    const $homeForText = cheerio.load(homepageHtml);
+    result.homepageText = extractPageText($homeForText);
 
     // Extract signals from homepage
     for (const email of extractEmails($home)) allEmails.add(email);

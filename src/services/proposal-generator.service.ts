@@ -29,6 +29,7 @@ export const SiteContentSchema = z.object({
   brand: z.object({
     tagline:     z.string().min(1).max(120),
     description: z.string().min(1).max(500),
+    manifesto:   z.string().min(1).max(220).optional(),
   }),
   hero: z.object({
     imageQuery: z.string().min(1).max(80),
@@ -79,6 +80,8 @@ export const SiteContentSchema = z.object({
 export type SiteContent = z.infer<typeof SiteContentSchema>;
 
 import { callAIWithProvider } from '../lib/ai.js';
+import type { LeadStudy } from './lead-study.service.js';
+import type { Strategy } from './lead-strategy.service.js';
 
 /* ------------------------------------------------------------------ */
 /*  Generator input                                                    */
@@ -106,14 +109,39 @@ export interface GeneratorInput {
 /*  Prompt construction                                                */
 /* ------------------------------------------------------------------ */
 
-export function buildSystemPrompt(): string {
-  return `You are a senior B2B web designer drafting a real one-page website for a small business in the United States.
+export function buildSystemPrompt(study?: LeadStudy, strategy?: Strategy): string {
+  const studyStrategySection = (study && strategy) ? `
+
+=== STUDY AND STRATEGY PROVIDED ===
+You have been given a structured Study (Layer 1) and Strategy (Layer 2) for this lead.
+Study summary:
+- Current site has website: ${study.currentSite.hasWebsite}
+- Design assessment: ${study.currentSite.designAssessment}
+- Key weaknesses: ${study.currentSite.weaknesses.join('; ')}
+- Missing features: ${study.currentSite.missingFeatures.join('; ')}
+- Copy tone now: ${study.currentSite.copyToneNow}
+- Actual services: ${study.business.actualServices.join(', ')}
+- Target customers: ${study.business.targetCustomers}
+- Unique angles: ${study.business.uniqueAngles.join('; ')}
+- Location context: ${study.business.locationContext}
+- Customer language: ${study.voice.customerLanguage.join('; ')}
+- Key pain points: ${study.voice.keyPainPoints.join('; ')}
+- Key aspirations: ${study.voice.keyAspirations.join('; ')}
+
+Strategy summary:
+- Hero angle: ${strategy.heroAngle}
+- Copy tone: ${strategy.copyTone}
+- Manifesto seed: ${strategy.manifestoSeed}
+- Design priorities: ${strategy.designPriorities.join('; ')}
+- Conversion opportunities: ${strategy.conversionOpportunities.map((c) => `[${c.gap}] → [${c.fix}]`).join('; ')}` : '';
+
+  return `You are a senior B2B web designer drafting a real one-page website for a small business in the United States.${studyStrategySection}
 
 Output STRICT JSON ONLY, matching this exact schema. No markdown. No prose around the JSON. No comments.
 
 Schema:
 {
-  "brand": { "tagline": string<=120, "description": string<=500 },
+  "brand": { "tagline": string<=120, "description": string<=500, "manifesto": string<=220 },
   "hero": { "imageQuery": string<=80, "ctaLabel": string<=40, "ctaAction": "call"|"email"|"scroll-to-form" },
   "stats": { "showRating": boolean, "showReviewCount": boolean } | null,
   "services": [ { "icon": IconName, "title": string<=80, "description": string<=320 } ]   // 4 to 8 items
@@ -151,11 +179,21 @@ Rules:
     - "scroll-to-form" for everything else — scrolls to the accept form
     The \`ctaLabel\` should match: "Call Now", "Book Appointment", "Get a Quote", etc.
 14. STATS STRIP — set \`stats: null\` if Google rating < 4.0 OR review count < 25 (not impressive enough to lead with). Otherwise set \`{"showRating": true, "showReviewCount": true}\` — both render together as a star rating strip.
+15. BRAND.MANIFESTO — a single powerful sentence (max 220 chars) that captures the core brand promise. It is different from the tagline (tagline is punchy/short; manifesto is the deeper why). When a Strategy is provided, crystallize the Strategy's manifestoSeed into this field. When no Strategy is provided, derive it from the business's strongest unique angle. Never use clichés.
+18. STUDY + STRATEGY ARE THE FOUNDATION. When a Study and Strategy are provided (see the section above), EVERY field you generate must trace back to these documents:
+    - \`brand.tagline\` and \`brand.description\` must reflect the Strategy's \`heroAngle\` and copyTone.
+    - \`brand.manifesto\` must crystallize the Strategy's \`manifestoSeed\` into one strong sentence.
+    - \`diagnosis.bullets\` must come from the Study's \`currentSite.weaknesses\` and Strategy's \`conversionOpportunities.gap\`. Each bullet's \`evidence\` is the customer language or specific gap, not generic.
+    - \`services\` must come from the Study's \`business.actualServices\` — these are the lead's REAL services as evidenced by their site/reviews, not invented.
+    - \`testimonials\` may include short snippets from the Study's \`voice.customerLanguage\` arrays.
+    - \`hero.eyebrow\` references the Study's \`business.locationContext\`.
+    - If the Study says \`currentSite.hasWebsite: false\`, the diagnosis bullets focus on the absence of a site rather than its weaknesses.
+    If a field cannot be grounded in the Study/Strategy, cut it or set it to an array's minimum allowed length. Never fabricate.
 
 Return ONLY the JSON object.`;
 }
 
-export function buildUserPrompt(input: GeneratorInput): string {
+export function buildUserPrompt(input: GeneratorInput, study?: LeadStudy, strategy?: Strategy): string {
   const lines: string[] = [];
   lines.push(`Business: ${input.businessName}`);
   lines.push(`Category: ${input.category}`);
@@ -192,6 +230,18 @@ export function buildUserPrompt(input: GeneratorInput): string {
     lines.push(`Operator notes: ${input.operatorNotes.trim()}`);
   }
 
+  if (study) {
+    lines.push('');
+    lines.push('=== STUDY (Layer 1 — full JSON) ===');
+    lines.push(JSON.stringify(study, null, 2));
+  }
+
+  if (strategy) {
+    lines.push('');
+    lines.push('=== STRATEGY (Layer 2 — full JSON) ===');
+    lines.push(JSON.stringify(strategy, null, 2));
+  }
+
   return lines.join('\n');
 }
 
@@ -201,10 +251,12 @@ export function buildUserPrompt(input: GeneratorInput): string {
 
 export async function generateSiteContent(
   input: GeneratorInput,
+  study?: LeadStudy,
+  strategy?: Strategy,
 ): Promise<SiteContent> {
   const raw = await callAIWithProvider('anthropic', {
-    systemPrompt: buildSystemPrompt(),
-    userPrompt: buildUserPrompt(input),
+    systemPrompt: buildSystemPrompt(study, strategy),
+    userPrompt: buildUserPrompt(input, study, strategy),
     json: true,
   });
 
@@ -213,8 +265,8 @@ export async function generateSiteContent(
 
   // First validation failure — retry once with a corrective system message
   const correctiveRaw = await callAIWithProvider('anthropic', {
-    systemPrompt: `${buildSystemPrompt()}\n\nIMPORTANT: Your previous response failed validation: ${parsed.error}. Return ONLY valid JSON matching the schema exactly.`,
-    userPrompt: buildUserPrompt(input),
+    systemPrompt: `${buildSystemPrompt(study, strategy)}\n\nIMPORTANT: Your previous response failed validation: ${parsed.error}. Return ONLY valid JSON matching the schema exactly.`,
+    userPrompt: buildUserPrompt(input, study, strategy),
     json: true,
   });
 
