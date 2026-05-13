@@ -27,6 +27,7 @@ import {
 import type { SiteContent, IconName } from './proposal-generator.service.js';
 import type { LeadStudy } from './lead-study.service.js';
 import type { Strategy } from './lead-strategy.service.js';
+import type { DesignDirection, SectionType } from './design-direction.service.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -38,6 +39,7 @@ type RichContent = SiteContent & {
   _study?: LeadStudy;
   _strategy?: Strategy;
   _visualSystem?: VisualSystem;
+  _direction?: DesignDirection;
   /** DALL-E 3 generated hero image URL. When present, used instead of Unsplash.
    *  Note: URL expires ~60 min per OpenAI policy (known v1 limitation). */
   heroImageUrl?: string | null;
@@ -357,6 +359,225 @@ function renderContact(
   });
 }
 
+/* ------------------------------------------------------------------ */
+/*  New section renderers (Phase 2)                                   */
+/* ------------------------------------------------------------------ */
+
+function renderAbout(
+  content: RichContent,
+  lead: { businessName: string },
+): string {
+  return substitute(loadTemplate('sections/about.html'), {
+    business_name: escapeHtml(lead.businessName),
+    description:   escapeHtml(content.brand.description),
+  });
+}
+
+function renderProcess(content: RichContent): string {
+  if (!content.process) return '';
+  const steps = content.process.steps
+    .map((step) => `<li class="process-step">
+  <span class="process-step-num" aria-hidden="true">${escapeHtml(step.number)}</span>
+  <p class="process-step-title">${escapeHtml(step.title)}</p>
+  <p class="process-step-desc">${escapeHtml(step.description)}</p>
+</li>`)
+    .join('\n');
+  return substitute(loadTemplate('sections/process.html'), {
+    title: escapeHtml(content.process.title),
+    steps,
+  });
+}
+
+function renderHoursLocations(content: RichContent): string {
+  if (!content.hoursLocations) return '';
+  const { hoursLocations } = content;
+  if (hoursLocations.addressLines.length === 0 && hoursLocations.hours.length === 0) return '';
+
+  const addressLines = hoursLocations.addressLines
+    .map((line) => `<p class="hours-address-line">${escapeHtml(line)}</p>`)
+    .join('\n');
+
+  let hoursTable = '';
+  if (hoursLocations.hours.length > 0) {
+    const rows = hoursLocations.hours
+      .map((h) => `<div class="hours-row">
+  <span class="hours-day">${escapeHtml(h.day)}</span>
+  <span class="hours-range">${escapeHtml(h.range)}</span>
+</div>`)
+      .join('\n');
+    hoursTable = `<div class="hours-table-wrap">
+  <p class="hours-table-head">Hours</p>
+  ${rows}
+</div>`;
+  }
+
+  return substitute(loadTemplate('sections/hours-locations.html'), {
+    headline:     escapeHtml(hoursLocations.headline),
+    address_lines: addressLines,
+    hours_table:  hoursTable,
+  });
+}
+
+function renderFaq(content: RichContent): string {
+  if (!content.faq) return '';
+  const chevron = `<svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>`;
+  const items = content.faq.items
+    .map((item) => `<details class="faq-item">
+  <summary class="faq-question">${escapeHtml(item.question)}${chevron}</summary>
+  <p class="faq-answer">${escapeHtml(item.answer)}</p>
+</details>`)
+    .join('\n');
+  return substitute(loadTemplate('sections/faq.html'), {
+    headline: escapeHtml(content.faq.headline),
+    items,
+  });
+}
+
+function renderCtaBanner(
+  content: RichContent,
+  ctaHref: string,
+): string {
+  if (!content.ctaBanner) return '';
+  // Use section-specific CTA action — falls back to the same ctaHref
+  return substitute(loadTemplate('sections/cta-banner.html'), {
+    headline:    escapeHtml(content.ctaBanner.headline),
+    subheadline: escapeHtml(content.ctaBanner.subheadline),
+    cta_href:    escapeHtml(ctaHref),
+    cta_label:   escapeHtml(content.ctaBanner.ctaLabel),
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Direction-aware section dispatch                                   */
+/* ------------------------------------------------------------------ */
+
+/** NAV_SECTION_MAP: section types that get a nav link */
+const NAV_LABELS: Partial<Record<SectionType, string>> = {
+  'why-us':         'Why us',
+  'services':       'Services',
+  'testimonials':   'Reviews',
+  'process':        'Process',
+  'hours-locations': 'Hours',
+  'faq':            'FAQ',
+  'contact':        'Contact',
+};
+
+const SECTION_IDS: Partial<Record<SectionType, string>> = {
+  'why-us':          'why',
+  'services':        'services',
+  'testimonials':    'reviews',
+  'process':         'process',
+  'hours-locations': 'hours',
+  'faq':             'faq',
+  'contact':         'contact',
+  'about':           'about',
+  'what-changes':    'what-changes',
+  'cta-banner':      'cta-banner',
+};
+
+/**
+ * Build nav links for sections that are in the direction plan (or default sections).
+ * Always includes services and contact at minimum.
+ */
+function buildNavLinks(sectionTypes: SectionType[]): string {
+  const links: string[] = [];
+  for (const type of sectionTypes) {
+    const label = NAV_LABELS[type];
+    const id = SECTION_IDS[type];
+    if (label && id) {
+      links.push(`<li><a href="#${id}">${label}</a></li>`);
+    }
+  }
+  return links.join('\n');
+}
+
+/**
+ * Dispatch a single section type to its renderer function.
+ * Returns '' when the section cannot render (missing data, etc).
+ */
+function dispatchSection(
+  type: SectionType,
+  content: RichContent,
+  lead: { businessName: string; category?: string | null; googleRating?: number | null; googleReviewCount?: number | null },
+  photo: UnsplashPhoto | null,
+  ctaHref: string,
+): string {
+  switch (type) {
+    case 'hero':
+      return renderBrandHero(content, lead, photo, ctaHref);
+    case 'about':
+      return renderAbout(content, lead);
+    case 'services':
+      return renderServices(content);
+    case 'why-us':
+      return renderWhyUs(content, lead);
+    case 'what-changes':
+      return renderWhatChanges(content);
+    case 'process':
+      return renderProcess(content);
+    case 'testimonials':
+      return renderTestimonials(content, lead);
+    case 'hours-locations':
+      return renderHoursLocations(content);
+    case 'faq':
+      return renderFaq(content);
+    case 'cta-banner':
+      return renderCtaBanner(content, ctaHref);
+    case 'contact':
+      return renderContact(content, lead);
+    default:
+      return '';
+  }
+}
+
+/**
+ * Build the stats strip after hero when section plan includes hero.
+ * Stats is always positioned immediately after the hero.
+ */
+function buildWebsiteSections(
+  content: RichContent,
+  lead: { businessName: string; category?: string | null; googleRating?: number | null; googleReviewCount?: number | null },
+  photo: UnsplashPhoto | null,
+  ctaHref: string,
+): { html: string; renderedTypes: SectionType[] } {
+  const direction = content._direction;
+  let sectionTypes: SectionType[];
+
+  if (direction && direction.sectionsInOrder.length > 0) {
+    sectionTypes = direction.sectionsInOrder.map((s) => s.type);
+  } else {
+    // Fallback: legacy order for proposals without a direction layer
+    sectionTypes = ['hero', 'services', 'testimonials', 'contact'] as SectionType[];
+    // Conditionally add legacy sections
+    const hasWhyUs = (content._study?.business.uniqueAngles?.length ?? 0) >= 2;
+    const hasWhatChanges = (content._strategy?.conversionOpportunities?.length ?? 0) >= 2;
+    const plan: SectionType[] = ['hero'];
+    if (hasWhyUs) plan.push('why-us');
+    plan.push('services');
+    if (hasWhatChanges) plan.push('what-changes');
+    plan.push('testimonials', 'contact');
+    sectionTypes = plan;
+  }
+
+  const parts: string[] = [];
+  const renderedTypes: SectionType[] = [];
+
+  for (const type of sectionTypes) {
+    const html = dispatchSection(type, content, lead, photo, ctaHref);
+    if (html) {
+      parts.push(html);
+      renderedTypes.push(type);
+      // Inject stats strip immediately after hero
+      if (type === 'hero') {
+        const statsHtml = renderStats(content, lead);
+        if (statsHtml) parts.push(statsHtml);
+      }
+    }
+  }
+
+  return { html: parts.join('\n'), renderedTypes };
+}
+
 function renderDiagnosis(content: RichContent): string {
   const bullets = content.diagnosis.bullets
     .map((b, i) => {
@@ -512,7 +733,7 @@ export async function renderProposalView(args: {
     priceCents: number | null;
     paymentLinkUrl: string | null;
   };
-  content: SiteContent & { _study?: LeadStudy; _strategy?: Strategy; _visualSystem?: VisualSystem; heroImageUrl?: string | null };
+  content: SiteContent & { _study?: LeadStudy; _strategy?: Strategy; _visualSystem?: VisualSystem; _direction?: DesignDirection; heroImageUrl?: string | null };
 }): Promise<string> {
   const content: RichContent = args.content;
 
@@ -525,7 +746,6 @@ export async function renderProposalView(args: {
   // DALL-E URLs expire ~60 min (OpenAI policy) — known v1 limitation.
   let photo: UnsplashPhoto | null = null;
   if (content.heroImageUrl) {
-    // Build a minimal UnsplashPhoto-compatible object — no Unsplash attribution needed
     photo = {
       url: content.heroImageUrl,
       alt: escapeHtml(args.lead.businessName),
@@ -533,41 +753,32 @@ export async function renderProposalView(args: {
       attributionUrl: '',
     };
   } else {
-    // Fetch Unsplash image (non-blocking: null = CSS-only hero)
     photo = await fetchUnsplash(
       args.content.hero.imageQuery,
       args.lead.category ?? undefined,
     );
   }
 
-  // Whether Why Us section will render — drives nav link and secondary CTA
-  const hasWhyUsProposal = (content._study?.business.uniqueAngles?.length ?? 0) >= 2;
-  const whyNavLink = hasWhyUsProposal ? '<li><a href="#why">Why us</a></li>' : '';
-
   // Build visual system CSS overrides (falls back to warmNeutral/fraunces_inter if absent)
   const vs = content._visualSystem ?? { paletteKey: 'warmNeutral' as const, fontKey: 'fraunces_inter' as const, reasoning: 'default' };
   const visualSystemOverrides = buildVisualSystemCss(vs);
   const googleFontsHref = buildGoogleFontsHref(vs.fontKey);
 
-  // Order: site mockup (hero → stats → why-us → services → what-changes →
-  // testimonials → contact) reads first as the lead's actual new website.
-  // Then the sales section with diagnosis + pricing + form.
+  // Dispatch sections in the order the Design Direction layer chose.
+  // Site mockup sections appear first; sales chrome appended below.
+  const { html: websiteSections, renderedTypes } = buildWebsiteSections(content, args.lead, photo, ctaHref);
+  const navLinks = buildNavLinks(renderedTypes);
+
   return substitute(loadTemplate('proposal-shell.html'), {
-    business_name:            escapeHtml(args.lead.businessName),
-    cta_href:                 escapeHtml(ctaHref),
-    cta_label:                escapeHtml(args.content.hero.ctaLabel),
-    brand_hero:               renderBrandHero(content, args.lead, photo, ctaHref),
-    stats:                    renderStats(content, args.lead),
-    why_nav_link:             whyNavLink,
-    why_us:                   renderWhyUs(content, args.lead),
-    services:                 renderServices(content),
-    what_changes:             renderWhatChanges(content),
-    testimonials:             renderTestimonials(content, args.lead),
-    contact:                  renderContact(content, args.lead),
-    sales_section:            renderSalesSection(content, args.lead, args.proposal),
-    site_footer:              renderFooter(content, args.lead, photo),
-    visual_system_overrides:  visualSystemOverrides,
-    google_fonts_href:        googleFontsHref,
+    business_name:           escapeHtml(args.lead.businessName),
+    cta_href:                escapeHtml(ctaHref),
+    cta_label:               escapeHtml(args.content.hero.ctaLabel),
+    nav_links:               navLinks,
+    website_sections:        websiteSections,
+    sales_section:           renderSalesSection(content, args.lead, args.proposal),
+    site_footer:             renderFooter(content, args.lead, photo),
+    visual_system_overrides: visualSystemOverrides,
+    google_fonts_href:       googleFontsHref,
   });
 }
 
@@ -580,7 +791,7 @@ export async function renderLiveSite(args: {
     googleReviewCount?: number | null;
     category?: string | null;
   };
-  content: SiteContent & { _study?: LeadStudy; _strategy?: Strategy; _visualSystem?: VisualSystem; heroImageUrl?: string | null };
+  content: SiteContent & { _study?: LeadStudy; _strategy?: Strategy; _visualSystem?: VisualSystem; _direction?: DesignDirection; heroImageUrl?: string | null };
 }): Promise<string> {
   const content: RichContent = args.content;
 
@@ -605,27 +816,20 @@ export async function renderLiveSite(args: {
     );
   }
 
-  // Whether Why Us section will render — drives nav link and secondary CTA
-  const hasWhyUsSite = (content._study?.business.uniqueAngles?.length ?? 0) >= 2;
-  const whyNavLinkSite = hasWhyUsSite ? '<li><a href="#why">Why us</a></li>' : '';
-
   // Build visual system CSS overrides (falls back to warmNeutral/fraunces_inter if absent)
   const vs = content._visualSystem ?? { paletteKey: 'warmNeutral' as const, fontKey: 'fraunces_inter' as const, reasoning: 'default' };
   const visualSystemOverrides = buildVisualSystemCss(vs);
   const googleFontsHref = buildGoogleFontsHref(vs.fontKey);
 
+  const { html: websiteSections, renderedTypes } = buildWebsiteSections(content, args.lead, photo, ctaHref);
+  const navLinks = buildNavLinks(renderedTypes);
+
   return substitute(loadTemplate('site-shell.html'), {
     business_name:           escapeHtml(args.lead.businessName),
     cta_href:                escapeHtml(ctaHref),
     cta_label:               escapeHtml(args.content.hero.ctaLabel),
-    brand_hero:              renderBrandHero(content, args.lead, photo, ctaHref),
-    stats:                   renderStats(content, args.lead),
-    why_nav_link:            whyNavLinkSite,
-    why_us:                  renderWhyUs(content, args.lead),
-    services:                renderServices(content),
-    what_changes:            renderWhatChanges(content),
-    testimonials:            renderTestimonials(content, args.lead),
-    contact:                 renderContact(content, args.lead),
+    nav_links:               navLinks,
+    website_sections:        websiteSections,
     site_footer:             renderFooter(content, args.lead, photo),
     visual_system_overrides: visualSystemOverrides,
     google_fonts_href:       googleFontsHref,

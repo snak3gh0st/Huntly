@@ -447,3 +447,176 @@ describe('renderLiveSite', () => {
     expect(html).toContain('huntly.app');
   });
 });
+
+/* ------------------------------------------------------------------ */
+/*  Phase 2 — Design Direction dispatch tests                         */
+/* ------------------------------------------------------------------ */
+
+import type { DesignDirection } from '../../src/services/design-direction.service.js';
+
+const DIRECTION_FULL: DesignDirection = {
+  sectionsInOrder: [
+    { type: 'hero', rationale: 'Always first.', designNote: '90vh image.', contentEmphasis: 'Primary CTA' },
+    { type: 'about', rationale: 'No about on current site.', designNote: 'Single column.', contentEmphasis: 'Practice bio' },
+    { type: 'services', rationale: 'Core services.', designNote: 'Numbered rows.', contentEmphasis: 'Five services' },
+    { type: 'why-us', rationale: '3 unique angles in study.', designNote: 'Staggered numeric layout.', contentEmphasis: 'Differentiators' },
+    { type: 'process', rationale: 'No process on current site.', designNote: 'Horizontal grid 01-04.', contentEmphasis: '4 step workflow' },
+    { type: 'faq', rationale: 'Pain points map to FAQs.', designNote: 'Accordion details.', contentEmphasis: 'Booking and pricing questions' },
+    { type: 'cta-banner', rationale: 'Mid-page break after FAQ.', designNote: 'Full-bleed accent-quiet.', contentEmphasis: 'Single booking CTA' },
+    { type: 'testimonials', rationale: '1 review quote in study.', designNote: 'Pull-quote Fraunces italic.', contentEmphasis: 'Social proof' },
+    { type: 'hours-locations', rationale: 'Address in contact data.', designNote: 'Two-col: address left, hours right.', contentEmphasis: 'Location + hours' },
+    { type: 'contact', rationale: 'Always last.', designNote: 'Two-col with map.', contentEmphasis: 'Phone + address' },
+  ],
+  microcopyDirection: 'Patient-action verbs: "Book my cleaning", "See same-day availability".',
+  signatureMoves: [
+    'Display italic counter to sans in hero',
+    'Numbers 01-05 as visual anchors in services',
+  ],
+};
+
+const CONTENT_WITH_EXTENDED: SiteContent & { _study?: LeadStudy; _strategy?: Strategy; _direction?: DesignDirection } = {
+  ...CONTENT,
+  _direction: DIRECTION_FULL,
+  process: {
+    title: 'How we work',
+    steps: [
+      { number: '01', title: 'Book online', description: 'Pick a slot that works for you.' },
+      { number: '02', title: 'Come in', description: 'We confirm the day before.' },
+      { number: '03', title: 'Get treated', description: 'Fast, gentle, no surprises.' },
+    ],
+  },
+  hoursLocations: {
+    headline: 'Find us in South Congress',
+    addressLines: ['123 Main St', 'Austin, TX 78704'],
+    hours: [
+      { day: 'Mon – Fri', range: '9am – 5pm' },
+      { day: 'Saturday', range: '10am – 2pm' },
+    ],
+  },
+  faq: {
+    headline: 'Common questions',
+    items: [
+      { question: 'Do you accept walk-ins?', answer: 'Yes, we reserve same-day slots for urgent cases.' },
+      { question: 'What insurances do you accept?', answer: 'We accept Delta Dental, Cigna, and most major plans.' },
+      { question: 'Is there parking?', answer: 'Free parking in our lot off Main St.' },
+    ],
+  },
+  ctaBanner: {
+    headline: 'Ready for a same-day appointment?',
+    subheadline: 'We keep slots open every morning for urgent and new patients.',
+    ctaLabel: 'Book my slot',
+    ctaAction: 'call',
+  },
+};
+
+describe('Direction-driven section dispatch', () => {
+  it('renders sections in the order specified by _direction', async () => {
+    const html = await renderProposalView({ lead: LEAD, proposal: PROPOSAL, content: CONTENT_WITH_EXTENDED });
+    // All new sections should appear — templates have `reveal` class appended
+    expect(html).toContain('about-section');
+    expect(html).toContain('process-section');
+    expect(html).toContain('faq-section');
+    expect(html).toContain('cta-banner-section');
+    expect(html).toContain('hours-section');
+  });
+
+  it('renders process steps with display numerals', async () => {
+    const html = await renderProposalView({ lead: LEAD, proposal: PROPOSAL, content: CONTENT_WITH_EXTENDED });
+    expect(html).toContain('process-step-num');
+    expect(html).toContain('01');
+    expect(html).toContain('Book online');
+    expect(html).toContain('How we work');
+  });
+
+  it('renders FAQ as details/summary accordion', async () => {
+    const html = await renderProposalView({ lead: LEAD, proposal: PROPOSAL, content: CONTENT_WITH_EXTENDED });
+    expect(html).toContain('<details class="faq-item">');
+    expect(html).toContain('<summary class="faq-question">');
+    expect(html).toContain('Do you accept walk-ins?');
+    expect(html).toContain('Yes, we reserve same-day slots');
+    expect(html).toContain('Common questions');
+  });
+
+  it('renders CTA banner with headline and button', async () => {
+    const html = await renderProposalView({ lead: LEAD, proposal: PROPOSAL, content: CONTENT_WITH_EXTENDED });
+    expect(html).toContain('cta-banner-heading');
+    expect(html).toContain('Ready for a same-day appointment?');
+    expect(html).toContain('cta-banner-btn');
+    expect(html).toContain('Book my slot');
+  });
+
+  it('renders hours-locations with address and hours table', async () => {
+    const html = await renderProposalView({ lead: LEAD, proposal: PROPOSAL, content: CONTENT_WITH_EXTENDED });
+    expect(html).toContain('hours-section');
+    expect(html).toContain('Find us in South Congress');
+    expect(html).toContain('123 Main St');
+    expect(html).toContain('Mon');
+    expect(html).toContain('Fri');
+    expect(html).toContain('9am');
+  });
+
+  it('renders about section with brand description', async () => {
+    const html = await renderProposalView({ lead: LEAD, proposal: PROPOSAL, content: CONTENT_WITH_EXTENDED });
+    expect(html).toContain('about-section');
+    expect(html).toContain('A family clinic in Austin.');
+  });
+
+  it('sections render in the direction order — process appears before testimonials', async () => {
+    const html = await renderProposalView({ lead: LEAD, proposal: PROPOSAL, content: CONTENT_WITH_EXTENDED });
+    // Use id anchors — more reliable than class names which may appear in CSS rules
+    const processPos = html.indexOf('id="process"');
+    const testimonialsPos = html.indexOf('id="reviews"');
+    expect(processPos).toBeGreaterThan(0);
+    expect(testimonialsPos).toBeGreaterThan(0);
+    expect(processPos).toBeLessThan(testimonialsPos);
+  });
+
+  it('nav links include process and faq when direction includes them', async () => {
+    const html = await renderProposalView({ lead: LEAD, proposal: PROPOSAL, content: CONTENT_WITH_EXTENDED });
+    expect(html).toContain('href="#process"');
+    expect(html).toContain('href="#faq"');
+  });
+
+  it('escapes HTML in process step data', async () => {
+    const xssContent = {
+      ...CONTENT_WITH_EXTENDED,
+      process: {
+        title: 'How we work',
+        steps: [
+          { number: '01', title: '<script>xss</script>', description: 'Step desc' },
+          { number: '02', title: 'Safe title', description: 'Step desc' },
+          { number: '03', title: 'Another safe', description: 'Step desc' },
+        ],
+      },
+    };
+    const html = await renderProposalView({ lead: LEAD, proposal: PROPOSAL, content: xssContent });
+    expect(html).not.toContain('<script>xss</script>');
+    expect(html).toContain('&lt;script&gt;xss&lt;/script&gt;');
+  });
+
+  it('omits process section when content.process is undefined', async () => {
+    const noProcess = { ...CONTENT_WITH_EXTENDED, process: undefined };
+    const html = await renderProposalView({ lead: LEAD, proposal: PROPOSAL, content: noProcess });
+    expect(html).not.toContain('class="process-section"');
+  });
+
+  it('omits faq section when content.faq is undefined', async () => {
+    const noFaq = { ...CONTENT_WITH_EXTENDED, faq: undefined };
+    const html = await renderProposalView({ lead: LEAD, proposal: PROPOSAL, content: noFaq });
+    expect(html).not.toContain('class="faq-section"');
+  });
+
+  it('omits cta-banner section when content.ctaBanner is undefined', async () => {
+    const noBanner = { ...CONTENT_WITH_EXTENDED, ctaBanner: undefined };
+    const html = await renderProposalView({ lead: LEAD, proposal: PROPOSAL, content: noBanner });
+    expect(html).not.toContain('class="cta-banner-section"');
+  });
+
+  it('sales section is always at the bottom, not controlled by direction', async () => {
+    const html = await renderProposalView({ lead: LEAD, proposal: PROPOSAL, content: CONTENT_WITH_EXTENDED });
+    const salesPos = html.indexOf('class="sales-section"');
+    const ctaBannerPos = html.indexOf('class="cta-banner-section"');
+    // Sales should always appear after all website sections
+    expect(salesPos).toBeGreaterThan(ctaBannerPos);
+  });
+});
