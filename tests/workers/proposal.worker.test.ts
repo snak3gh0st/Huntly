@@ -3,6 +3,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockStudyLead = vi.fn();
 const mockStrategize = vi.fn();
 const mockGenerateSiteContent = vi.fn();
+const mockPickVisualSystem = vi.fn();
+const mockGenerateHeroImage = vi.fn().mockResolvedValue(null);
+const mockBuildHeroImagePrompt = vi.fn().mockReturnValue('test prompt');
+const mockCritiquePass = vi.fn();
 const mockProposalUpdate = vi.fn();
 const mockProposalFindById = vi.fn();
 
@@ -16,6 +20,19 @@ vi.mock('../../src/services/lead-strategy.service.js', () => ({
 
 vi.mock('../../src/services/proposal-generator.service.js', () => ({
   generateSiteContent: (...a: unknown[]) => mockGenerateSiteContent(...a),
+}));
+
+vi.mock('../../src/services/visual-system.service.js', () => ({
+  pickVisualSystem: (...a: unknown[]) => mockPickVisualSystem(...a),
+}));
+
+vi.mock('../../src/lib/dalle.js', () => ({
+  generateHeroImage: (...a: unknown[]) => mockGenerateHeroImage(...a),
+  buildHeroImagePrompt: (...a: unknown[]) => mockBuildHeroImagePrompt(...a),
+}));
+
+vi.mock('../../src/services/critique-pass.service.js', () => ({
+  critiquePass: (...a: unknown[]) => mockCritiquePass(...a),
 }));
 
 vi.mock('../../src/db/index.js', () => ({
@@ -84,6 +101,18 @@ const VALID_CONTENT = {
   cta: { primaryLabel: 'Accept', reassurance: 'r' },
 };
 
+const VALID_VISUAL_SYSTEM = {
+  paletteKey: 'warmNeutral',
+  fontKey: 'fraunces_inter',
+  reasoning: 'Warm tones suit a dental clinic.',
+};
+
+const VALID_CRITIQUE = {
+  overallScore: 8,
+  issues: [],
+  applyFix: [],
+};
+
 const PROPOSAL_WITH_LEAD = {
   id: 'prop-1',
   leadId: 'lead-1',
@@ -110,38 +139,42 @@ const PROPOSAL_WITH_LEAD = {
 describe('runProposalJob', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('calls all three layers in order and stores all outputs', async () => {
+  function setupHappyPath() {
     mockProposalFindById.mockResolvedValue(PROPOSAL_WITH_LEAD);
     mockStudyLead.mockResolvedValue(VALID_STUDY);
     mockStrategize.mockResolvedValue(VALID_STRATEGY);
+    mockPickVisualSystem.mockResolvedValue(VALID_VISUAL_SYSTEM);
+    mockGenerateHeroImage.mockResolvedValue(null);
     mockGenerateSiteContent.mockResolvedValue(VALID_CONTENT);
+    mockCritiquePass.mockResolvedValue({ critique: VALID_CRITIQUE, appliedContent: VALID_CONTENT });
+  }
+
+  it('calls all pipeline layers in order and stores all outputs', async () => {
+    setupHappyPath();
 
     await runProposalJob({ proposalId: 'prop-1' });
 
-    // All three layers were called
+    // All layers were called
     expect(mockStudyLead).toHaveBeenCalledTimes(1);
     expect(mockStrategize).toHaveBeenCalledTimes(1);
+    expect(mockPickVisualSystem).toHaveBeenCalledTimes(1);
     expect(mockGenerateSiteContent).toHaveBeenCalledTimes(1);
+    expect(mockCritiquePass).toHaveBeenCalledTimes(1);
 
     // Layer 2 receives Layer 1 output
-    expect(mockStrategize).toHaveBeenCalledWith(
-      expect.anything(),
-      VALID_STUDY,
-    );
+    expect(mockStrategize).toHaveBeenCalledWith(expect.anything(), VALID_STUDY);
 
     // Layer 3 receives Layer 1 + Layer 2 outputs
     expect(mockGenerateSiteContent).toHaveBeenCalledWith(
-      expect.anything(),
-      VALID_STUDY,
-      VALID_STRATEGY,
+      expect.anything(), VALID_STUDY, VALID_STRATEGY,
     );
+
+    // Critique receives generated content + study + strategy
+    expect(mockCritiquePass).toHaveBeenCalledWith(VALID_CONTENT, VALID_STUDY, VALID_STRATEGY);
   });
 
-  it('stores _study, _strategy, and siteContent in proposal.content', async () => {
-    mockProposalFindById.mockResolvedValue(PROPOSAL_WITH_LEAD);
-    mockStudyLead.mockResolvedValue(VALID_STUDY);
-    mockStrategize.mockResolvedValue(VALID_STRATEGY);
-    mockGenerateSiteContent.mockResolvedValue(VALID_CONTENT);
+  it('stores all layers including _critique and _visualSystem in proposal.content', async () => {
+    setupHappyPath();
 
     await runProposalJob({ proposalId: 'prop-1' });
 
@@ -152,7 +185,8 @@ describe('runProposalJob', () => {
         content: expect.objectContaining({
           _study: VALID_STUDY,
           _strategy: VALID_STRATEGY,
-          ...VALID_CONTENT,
+          _visualSystem: VALID_VISUAL_SYSTEM,
+          _critique: VALID_CRITIQUE,
         }),
         suggestedTier: 'Pro',  // 120 reviews
       }),
@@ -197,6 +231,8 @@ describe('runProposalJob', () => {
     mockProposalFindById.mockResolvedValue(PROPOSAL_WITH_LEAD);
     mockStudyLead.mockResolvedValue(VALID_STUDY);
     mockStrategize.mockResolvedValue(VALID_STRATEGY);
+    mockPickVisualSystem.mockResolvedValue(VALID_VISUAL_SYSTEM);
+    mockGenerateHeroImage.mockResolvedValue(null);
     mockGenerateSiteContent.mockRejectedValue(new Error('Anthropic timeout'));
 
     await runProposalJob({ proposalId: 'prop-1' });
@@ -222,10 +258,7 @@ describe('runProposalJob', () => {
   });
 
   it('passes operator notes from job data into the generator input (Layer 1)', async () => {
-    mockProposalFindById.mockResolvedValue(PROPOSAL_WITH_LEAD);
-    mockStudyLead.mockResolvedValue(VALID_STUDY);
-    mockStrategize.mockResolvedValue(VALID_STRATEGY);
-    mockGenerateSiteContent.mockResolvedValue(VALID_CONTENT);
+    setupHappyPath();
 
     await runProposalJob({ proposalId: 'prop-1', operatorNotes: 'Hire dentist soon' });
 

@@ -9,6 +9,7 @@ import { studyLead } from '../services/lead-study.service.js';
 import { strategize } from '../services/lead-strategy.service.js';
 import { pickVisualSystem } from '../services/visual-system.service.js';
 import { generateHeroImage, buildHeroImagePrompt } from '../lib/dalle.js';
+import { critiquePass } from '../services/critique-pass.service.js';
 import { suggestTier } from '../lib/pricing-tiers.js';
 import type { Prisma } from '@prisma/client';
 
@@ -76,16 +77,20 @@ export async function runProposalJob(data: ProposalJobData): Promise<void> {
     // Layer 3 — Build: generate final site content grounded in study + strategy
     const siteContent = await generateSiteContent(input, study, strategy);
 
+    // Layer 4 — Critique: Claude reviews its own output and applies targeted fixes
+    const { critique, appliedContent } = await critiquePass(siteContent, study, strategy);
+
     await proposalRepo.update(data.proposalId, {
       status: 'draft',
       // Store all layers. Renderer reads SiteContent fields + _study/_strategy/_visualSystem.
-      // heroImageUrl is stored at top level for direct renderer access.
+      // _critique is stored for operator inspection. heroImageUrl for direct renderer access.
       content: {
         _study: study,
         _strategy: strategy,
         _visualSystem: visualSystem,
+        _critique: critique,
         heroImageUrl: heroImage?.url ?? null,
-        ...siteContent,
+        ...appliedContent,
       } as unknown as Prisma.InputJsonValue,
       suggestedTier: suggestTier(lead.googleReviewCount),
       generationError: null,
