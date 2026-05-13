@@ -8,6 +8,7 @@ import {
 import { studyLead } from '../services/lead-study.service.js';
 import { strategize } from '../services/lead-strategy.service.js';
 import { pickVisualSystem } from '../services/visual-system.service.js';
+import { generateHeroImage, buildHeroImagePrompt } from '../lib/dalle.js';
 import { suggestTier } from '../lib/pricing-tiers.js';
 import type { Prisma } from '@prisma/client';
 
@@ -61,16 +62,29 @@ export async function runProposalJob(data: ProposalJobData): Promise<void> {
     // Layer 2.5 — Visual system: pick palette + font pairing that fits this lead
     const visualSystem = await pickVisualSystem(study, strategy);
 
+    // Layer 2.6 — DALL-E 3 hero image (best-effort; null = fall back to Unsplash)
+    // Prompt is derived from locationContext + copyTone + palette mood.
+    // Known limitation: DALL-E 3 URLs expire ~60 min (OpenAI policy).
+    // v2 fix: download + re-host on Huntly static assets / Cloudflare R2.
+    const heroImagePrompt = buildHeroImagePrompt(
+      study.business.locationContext,
+      strategy.copyTone,
+      visualSystem.paletteKey,
+    );
+    const heroImage = await generateHeroImage(heroImagePrompt);
+
     // Layer 3 — Build: generate final site content grounded in study + strategy
     const siteContent = await generateSiteContent(input, study, strategy);
 
     await proposalRepo.update(data.proposalId, {
       status: 'draft',
       // Store all layers. Renderer reads SiteContent fields + _study/_strategy/_visualSystem.
+      // heroImageUrl is stored at top level for direct renderer access.
       content: {
         _study: study,
         _strategy: strategy,
         _visualSystem: visualSystem,
+        heroImageUrl: heroImage?.url ?? null,
         ...siteContent,
       } as unknown as Prisma.InputJsonValue,
       suggestedTier: suggestTier(lead.googleReviewCount),

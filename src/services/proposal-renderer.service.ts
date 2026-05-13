@@ -38,6 +38,9 @@ type RichContent = SiteContent & {
   _study?: LeadStudy;
   _strategy?: Strategy;
   _visualSystem?: VisualSystem;
+  /** DALL-E 3 generated hero image URL. When present, used instead of Unsplash.
+   *  Note: URL expires ~60 min per OpenAI policy (known v1 limitation). */
+  heroImageUrl?: string | null;
 };
 
 /* ------------------------------------------------------------------ */
@@ -503,7 +506,7 @@ export async function renderProposalView(args: {
     priceCents: number | null;
     paymentLinkUrl: string | null;
   };
-  content: SiteContent & { _study?: LeadStudy; _strategy?: Strategy; _visualSystem?: VisualSystem };
+  content: SiteContent & { _study?: LeadStudy; _strategy?: Strategy; _visualSystem?: VisualSystem; heroImageUrl?: string | null };
 }): Promise<string> {
   const content: RichContent = args.content;
 
@@ -512,11 +515,24 @@ export async function renderProposalView(args: {
     email: args.lead.email,
   });
 
-  // Fetch Unsplash image (non-blocking: null = CSS-only hero)
-  const photo = await fetchUnsplash(
-    args.content.hero.imageQuery,
-    args.lead.category ?? undefined,
-  );
+  // Prefer DALL-E generated hero image when available; fall back to Unsplash, then CSS-only.
+  // DALL-E URLs expire ~60 min (OpenAI policy) — known v1 limitation.
+  let photo: UnsplashPhoto | null = null;
+  if (content.heroImageUrl) {
+    // Build a minimal UnsplashPhoto-compatible object — no Unsplash attribution needed
+    photo = {
+      url: content.heroImageUrl,
+      alt: escapeHtml(args.lead.businessName),
+      attribution: '',
+      attributionUrl: '',
+    };
+  } else {
+    // Fetch Unsplash image (non-blocking: null = CSS-only hero)
+    photo = await fetchUnsplash(
+      args.content.hero.imageQuery,
+      args.lead.category ?? undefined,
+    );
+  }
 
   // Whether Why Us section will render — drives nav link and secondary CTA
   const hasWhyUsProposal = (content._study?.business.uniqueAngles?.length ?? 0) >= 2;
@@ -558,7 +574,7 @@ export async function renderLiveSite(args: {
     googleReviewCount?: number | null;
     category?: string | null;
   };
-  content: SiteContent & { _study?: LeadStudy; _strategy?: Strategy; _visualSystem?: VisualSystem };
+  content: SiteContent & { _study?: LeadStudy; _strategy?: Strategy; _visualSystem?: VisualSystem; heroImageUrl?: string | null };
 }): Promise<string> {
   const content: RichContent = args.content;
 
@@ -567,10 +583,21 @@ export async function renderLiveSite(args: {
     email: args.lead.email,
   });
 
-  const photo = await fetchUnsplash(
-    args.content.hero.imageQuery,
-    args.lead.category ?? undefined,
-  );
+  // Prefer DALL-E generated hero image when available; fall back to Unsplash, then CSS-only.
+  let photo: UnsplashPhoto | null = null;
+  if (content.heroImageUrl) {
+    photo = {
+      url: content.heroImageUrl,
+      alt: escapeHtml(args.lead.businessName),
+      attribution: '',
+      attributionUrl: '',
+    };
+  } else {
+    photo = await fetchUnsplash(
+      args.content.hero.imageQuery,
+      args.lead.category ?? undefined,
+    );
+  }
 
   // Whether Why Us section will render — drives nav link and secondary CTA
   const hasWhyUsSite = (content._study?.business.uniqueAngles?.length ?? 0) >= 2;
