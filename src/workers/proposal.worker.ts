@@ -8,6 +8,7 @@ import {
 import { studyLead } from '../services/lead-study.service.js';
 import { strategize } from '../services/lead-strategy.service.js';
 import { pickVisualSystem } from '../services/visual-system.service.js';
+import { designDirection } from '../services/design-direction.service.js';
 import { generateHeroImage, buildHeroImagePrompt } from '../lib/dalle.js';
 import { critiquePass } from '../services/critique-pass.service.js';
 import { suggestTier } from '../lib/pricing-tiers.js';
@@ -74,8 +75,13 @@ export async function runProposalJob(data: ProposalJobData): Promise<void> {
     );
     const heroImage = await generateHeroImage(heroImagePrompt);
 
-    // Layer 3 — Build: generate final site content grounded in study + strategy
-    const siteContent = await generateSiteContent(input, study, strategy);
+    // Layer 2.7 — Design Direction: senior-designer Figma-thinking pass.
+    // Decides which sections this lead earns, in what order, with what
+    // visual treatment + microcopy voice + signature moves.
+    const direction = await designDirection(study, strategy, visualSystem);
+
+    // Layer 3 — Build: generate final site content grounded in study + strategy + direction
+    const siteContent = await generateSiteContent(input, study, strategy, direction);
 
     // Layer 4 — Critique: Claude reviews its own output and applies targeted fixes
     const { critique, appliedContent } = await critiquePass(siteContent, study, strategy);
@@ -88,6 +94,7 @@ export async function runProposalJob(data: ProposalJobData): Promise<void> {
         _study: study,
         _strategy: strategy,
         _visualSystem: visualSystem,
+        _direction: direction,
         _critique: critique,
         heroImageUrl: heroImage?.url ?? null,
         ...appliedContent,

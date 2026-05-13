@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { DesignDirection } from './design-direction.service.js';
 
 /* ------------------------------------------------------------------ */
 /*  Icon set — must match inline SVGs in templates                     */
@@ -58,6 +59,36 @@ export const SiteContentSchema = z.object({
     whatsapp: z.string().nullable(),
     hours:    z.string().nullable(),
   }),
+  // New sections generated when Design Direction includes them
+  process: z.object({
+    title: z.string().min(1).max(120),
+    steps: z.array(z.object({
+      number:      z.string().min(1).max(3),
+      title:       z.string().min(1).max(80),
+      description: z.string().min(1).max(320),
+    })).min(3).max(5),
+  }).optional(),
+  hoursLocations: z.object({
+    headline:     z.string().min(1).max(80),
+    addressLines: z.array(z.string().min(1).max(200)).max(4),
+    hours:        z.array(z.object({
+      day:   z.string().min(1).max(20),
+      range: z.string().min(1).max(40),
+    })).max(7),
+  }).optional(),
+  faq: z.object({
+    headline: z.string().min(1).max(120),
+    items:    z.array(z.object({
+      question: z.string().min(1).max(200),
+      answer:   z.string().min(1).max(400),
+    })).min(3).max(6),
+  }).optional(),
+  ctaBanner: z.object({
+    headline:     z.string().min(1).max(160),
+    subheadline:  z.string().min(1).max(240),
+    ctaLabel:     z.string().min(1).max(40),
+    ctaAction:    z.enum(['call', 'email', 'scroll-to-form']),
+  }).optional(),
   // proposalIntro is intentionally optional — the visible template no longer
   // renders it (the draft-preview banner replaced "Hi [team]..." framing).
   // Kept in the schema for backward compat with stored proposals; Claude is
@@ -317,6 +348,40 @@ const ClosingSectionsSchema = z.object({
 });
 type ClosingSections = z.infer<typeof ClosingSectionsSchema>;
 
+/** Section 4: extended sections driven by Design Direction plan */
+const ExtendedSectionsSchema = z.object({
+  process: z.object({
+    title: z.string().min(1).max(120),
+    steps: z.array(z.object({
+      number:      z.string().min(1).max(3),
+      title:       z.string().min(1).max(80),
+      description: z.string().min(1).max(320),
+    })).min(3).max(5),
+  }).optional(),
+  hoursLocations: z.object({
+    headline:     z.string().min(1).max(80),
+    addressLines: z.array(z.string().min(1).max(200)).max(4),
+    hours:        z.array(z.object({
+      day:   z.string().min(1).max(20),
+      range: z.string().min(1).max(40),
+    })).max(7),
+  }).optional(),
+  faq: z.object({
+    headline: z.string().min(1).max(120),
+    items:    z.array(z.object({
+      question: z.string().min(1).max(200),
+      answer:   z.string().min(1).max(400),
+    })).min(3).max(6),
+  }).optional(),
+  ctaBanner: z.object({
+    headline:    z.string().min(1).max(160),
+    subheadline: z.string().min(1).max(240),
+    ctaLabel:    z.string().min(1).max(40),
+    ctaAction:   z.enum(['call', 'email', 'scroll-to-form']),
+  }).optional(),
+});
+type ExtendedSections = z.infer<typeof ExtendedSectionsSchema>;
+
 /* ------------------------------------------------------------------ */
 /*  Shared rules block (injected into every section prompt)            */
 /* ------------------------------------------------------------------ */
@@ -396,13 +461,26 @@ async function callWithRetry<T>(
 /*  Section 1 — Hero + Brand                                          */
 /* ------------------------------------------------------------------ */
 
+function directionSummary(direction?: DesignDirection): string {
+  if (!direction) return '';
+  const sectionList = direction.sectionsInOrder.map((s) => `  - ${s.type}: ${s.contentEmphasis}`).join('\n');
+  return `
+=== DESIGN DIRECTION (Layer 2.7) ===
+Section plan (in order): ${direction.sectionsInOrder.map((s) => s.type).join(', ')}
+Microcopy direction: ${direction.microcopyDirection}
+Signature moves: ${direction.signatureMoves.join('; ')}
+Per-section content emphases:
+${sectionList}`;
+}
+
 async function generateHeroAndBrand(
   input: GeneratorInput,
   study?: LeadStudy,
   strategy?: Strategy,
+  direction?: DesignDirection,
 ): Promise<HeroAndBrand> {
   const systemPrompt = `You are writing the top-of-page content (brand identity + hero) for a small US business website.
-${studyStrategySummary(study, strategy)}
+${studyStrategySummary(study, strategy)}${directionSummary(direction)}
 
 Output STRICT JSON matching this schema:
 {
@@ -413,10 +491,11 @@ Output STRICT JSON matching this schema:
 
 Section rules:
 - brand.tagline: punchy, specific to this business, not generic. Grounded in Strategy heroAngle.
-- brand.description: 2-3 sentences expanding the tagline. Mirror Strategy copyTone and Study voice.customerLanguage.
+- brand.description: 2-3 sentences expanding the tagline. Mirror Strategy copyTone and Study voice.customerLanguage. The Design Direction's microcopyDirection should inform the voice.
 - brand.manifesto: crystallize Strategy manifestoSeed into one powerful sentence. Optional but preferred.
 - hero.imageQuery: 2-5 word Unsplash search phrase, vertical+location specific. No people queries.
 - hero.ctaAction: "call" for high-intent phone verticals, "email" for B2B/consultants, "scroll-to-form" otherwise.
+- hero.ctaLabel: follow the Design Direction's microcopyDirection — avoid "Get started", "Learn more", "Click here".
 - stats: null if Google rating < 4.0 OR review count < 25. Otherwise include showRating+showReviewCount=true.
 - PRICING MODEL: one-time investment, never "per month", "subscription", "monthly billing".
 
@@ -434,9 +513,10 @@ async function generateMidSections(
   input: GeneratorInput,
   study?: LeadStudy,
   strategy?: Strategy,
+  direction?: DesignDirection,
 ): Promise<MidSections> {
   const systemPrompt = `You are writing the middle sections (services, testimonials, contact) for a small US business website.
-${studyStrategySummary(study, strategy)}
+${studyStrategySummary(study, strategy)}${directionSummary(direction)}
 
 Output STRICT JSON matching this schema:
 {
@@ -448,7 +528,7 @@ Where IconName is one of: phone, calendar, globe, message, clock, star, shield, 
 
 Section rules:
 - services: use Study business.actualServices as the source. These are the lead's REAL services. 4 minimum, 8 maximum.
-- services.description: what the service does for the customer, in customer language. No generic "We offer..." opener.
+- services.description: what the service does for the customer, in customer language. No generic "We offer..." opener. Follow the Design Direction's contentEmphasis for the services section.
 - testimonials: ONLY quote snippets that appear in the Study voice.customerLanguage data. NEVER fabricate. Empty array if none.
 - contact: use null (not empty string) for unknown fields. Pull from input data (phone, address, hours).
 
@@ -492,20 +572,84 @@ ${sharedRules()}`;
 }
 
 /* ------------------------------------------------------------------ */
-/*  Generator — 3-call split                                          */
+/*  Section 4 — Extended sections (process / hoursLocations / faq /   */
+/*              ctaBanner) — only called when direction includes them  */
+/* ------------------------------------------------------------------ */
+
+async function generateExtendedSections(
+  input: GeneratorInput,
+  study: LeadStudy | undefined,
+  strategy: Strategy | undefined,
+  direction: DesignDirection,
+): Promise<ExtendedSections> {
+  const neededTypes = direction.sectionsInOrder.map((s) => s.type);
+  const needsProcess        = neededTypes.includes('process');
+  const needsHoursLocations = neededTypes.includes('hours-locations');
+  const needsFaq            = neededTypes.includes('faq');
+  const needsCtaBanner      = neededTypes.includes('cta-banner');
+
+  const sectionSchemas: string[] = [];
+  if (needsProcess) {
+    sectionSchemas.push(`  "process": { "title": string<=120, "steps": [ { "number": string (e.g. "01"), "title": string<=80, "description": string<=320 } ] }  // 3-5 steps`);
+  }
+  if (needsHoursLocations) {
+    sectionSchemas.push(`  "hoursLocations": { "headline": string<=80, "addressLines": string[] (max 4, each <=200), "hours": [ { "day": string<=20, "range": string<=40 } ] }  // 0-7 day entries`);
+  }
+  if (needsFaq) {
+    sectionSchemas.push(`  "faq": { "headline": string<=120, "items": [ { "question": string<=200, "answer": string<=400 } ] }  // 3-6 items`);
+  }
+  if (needsCtaBanner) {
+    sectionSchemas.push(`  "ctaBanner": { "headline": string<=160, "subheadline": string<=240, "ctaLabel": string<=40, "ctaAction": "call"|"email"|"scroll-to-form" }`);
+  }
+
+  const systemPrompt = `You are writing extended sections for a small US business website proposal.
+${studyStrategySummary(study, strategy)}${directionSummary(direction)}
+
+Generate ONLY the sections requested below. Omit any section not listed.
+
+Output STRICT JSON matching this schema:
+{
+${sectionSchemas.join(',\n')}
+}
+
+Section rules:
+- process: describe how this specific business works — their actual methodology. 3 to 5 numbered steps. Numbers as strings: "01", "02", etc. Ground each step in what the Study tells us about their services and workflow.
+- hoursLocations: derive from Study business.locationContext and contact data. addressLines: street, city, state, zip on separate lines. hours: each entry is one day-range pair (e.g. { "day": "Mon – Fri", "range": "8am – 6pm" }). If hours data is unavailable, use an empty array.
+- faq: 3 to 6 Q&A pairs that a real customer of this business would ask. Ground questions in Study voice.keyPainPoints and voice.keyAspirations. Answers should be specific to this business, not generic.
+- ctaBanner: a mid-page conversion moment. headline should be the strongest action statement for this lead. subheadline adds one line of context. ctaLabel follows the Design Direction microcopyDirection voice.
+
+${sharedRules()}`;
+
+  const userPrompt = buildUserPrompt(input, study, strategy);
+  return callWithRetry(ExtendedSectionsSchema, systemPrompt, userPrompt, 'Section 4 (extended)');
+}
+
+/* ------------------------------------------------------------------ */
+/*  Generator — parallel calls                                        */
 /* ------------------------------------------------------------------ */
 
 export async function generateSiteContent(
   input: GeneratorInput,
   study?: LeadStudy,
   strategy?: Strategy,
+  direction?: DesignDirection,
 ): Promise<SiteContent> {
-  // Run all 3 sections in parallel via Promise.all — faster and fine at typical proposal volumes.
+  // Determine which extended sections the direction plan includes
+  const sectionTypes = new Set(direction?.sectionsInOrder.map((s) => s.type) ?? []);
+  const needsProcess        = sectionTypes.has('process');
+  const needsHoursLocations = sectionTypes.has('hours-locations');
+  const needsFaq            = sectionTypes.has('faq');
+  const needsCtaBanner      = sectionTypes.has('cta-banner');
+
+  // Run all sections in parallel via Promise.all — faster and fine at typical proposal volumes.
   // If any section fails after its retry, the whole generation fails — no partial state.
-  const [heroAndBrand, midSections, closingSections] = await Promise.all([
-    generateHeroAndBrand(input, study, strategy),
-    generateMidSections(input, study, strategy),
+  const [heroAndBrand, midSections, closingSections, extendedSections] = await Promise.all([
+    generateHeroAndBrand(input, study, strategy, direction),
+    generateMidSections(input, study, strategy, direction),
     generateClosingSections(input, study, strategy),
+    (needsProcess || needsHoursLocations || needsFaq || needsCtaBanner)
+      ? generateExtendedSections(input, study, strategy, direction!)
+      : Promise.resolve(null),
   ]);
 
   // Merge into the final SiteContent shape — validate the merged result
@@ -520,6 +664,14 @@ export async function generateSiteContent(
     pricingPitch: closingSections.pricingPitch,
     cta:          closingSections.cta,
   };
+
+  // Merge extended sections when generated
+  if (extendedSections) {
+    if (needsProcess && extendedSections.process)               merged.process        = extendedSections.process;
+    if (needsHoursLocations && extendedSections.hoursLocations) merged.hoursLocations = extendedSections.hoursLocations;
+    if (needsFaq && extendedSections.faq)                       merged.faq            = extendedSections.faq;
+    if (needsCtaBanner && extendedSections.ctaBanner)           merged.ctaBanner      = extendedSections.ctaBanner;
+  }
 
   // Final full-schema validation as a safety net
   const validation = SiteContentSchema.safeParse(merged);
