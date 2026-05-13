@@ -14,7 +14,7 @@ The decision the page is meant to drive: pay one flat fee for the website Huntly
 
 The rendered per-lead site is a sales artifact AND the deliverable. If the lead accepts the proposal, the same content is deployed at `/sites/:slug` as their real website. So the page has two simultaneous jobs: (1) make the lead think *"this is way better than my current site"* within the first scroll, and (2) actually be the website we'll ship them. Quality has to clear both bars; there's no "we'll polish it after they pay."
 
-Success looks like: a lead opens the proposal link, scrolls past the diagnosis card (which uses crawler signals + their actual Google review quotes), sees the brand hero + services + their own testimonials rendered into a polished page, and the answer to "should I do this?" becomes obvious before they reach the pricing card. Conversion target: the operator's volume bet (flat $297/$597/$997 tiers) means the page has to convert at a rate where one closed lead per ~20 opens covers the AI generation cost plus operator time.
+Success looks like: a lead opens the proposal link, scrolls past the diagnosis card (which uses crawler signals + their actual Google review quotes), sees the brand hero + services + their own testimonials rendered into a polished page, and the answer to "should I do this?" becomes obvious before they reach the pricing card. Conversion target: the operator's volume bet (per-segment price ranges, see Pricing Model below) means the page has to convert at a rate where one closed lead per ~20 opens covers the AI generation cost plus operator time.
 
 ## Brand Personality
 
@@ -45,6 +45,51 @@ Emotional goals when the lead opens the page: trust (someone took this seriously
 4. **Restraint over decoration.** The page is for a small business, not a design portfolio. Each element earns its place: a section that doesn't move the lead toward "yes" gets cut. No decorative dividers, no animated accents that compete with content, no second hero.
 
 5. **Adapt without templating.** The same template renders for a dental clinic and a Mexican restaurant. The vertical-specific differences come from the content (service names, review quotes, brand tagline) — not from swapping CSS themes. The visual system has to flex without obviously template-shopping.
+
+## Pricing Model
+
+Price is a single one-time payment (build + 12 months hosting/maintenance). No subscriptions, no recurring billing — copy must never frame the price as "per month".
+
+The price for a given proposal is determined by three inputs: **segment** (industry × business size), **price range** (a `[min, max]` set per segment), and **difficulty** (a 0–1 score that positions the final price inside the segment's range).
+
+### Segments — industry × size
+
+Segments are a 2D matrix. The row is the lead's industry; the column is their business size (proxied by Google review count). Each cell of the matrix has its own `[min, max]` price range. Industries with higher complexity / regulatory weight / craft requirements occupy higher cells; smaller businesses occupy lower cells.
+
+**Industries** (TBD — fill in the list and order of complexity):
+
+- `<TBD industry 1>` — e.g. `dental`
+- `<TBD industry 2>` — e.g. `legal`
+- `<TBD industry 3>` — e.g. `restaurant`
+- `<TBD …>`
+- `other` — fallback for anything not on the list above
+
+**Size bands** (TBD — confirm or adjust the review-count cutoffs):
+
+- `S` — `< <TBD> Google reviews`
+- `M` — `<TBD>–<TBD> Google reviews`
+- `L` — `<TBD>+ Google reviews`
+
+**Price-range matrix** (TBD — fill in `[min, max]` USD per cell):
+
+| Industry | S | M | L |
+|---|---|---|---|
+| `<TBD industry 1>` | $`<min>`–$`<max>` | $`<min>`–$`<max>` | $`<min>`–$`<max>` |
+| `<TBD industry 2>` | $`<min>`–$`<max>` | $`<min>`–$`<max>` | $`<min>`–$`<max>` |
+| `<TBD industry 3>` | $`<min>`–$`<max>` | $`<min>`–$`<max>` | $`<min>`–$`<max>` |
+| `other`            | $`<min>`–$`<max>` | $`<min>`–$`<max>` | $`<min>`–$`<max>` |
+
+### Difficulty — positions price inside the range
+
+Difficulty is a single 0–1 score (0 = trivial build, 1 = worst-case). The final price is `min + difficulty × (max − min)`, rounded to the nearest whole dollar.
+
+Inputs to the difficulty score:
+
+1. **Field of work (industry) complexity** — implicit in the segment; treated as a baseline shift, not a difficulty input. Difficulty layers on *within* a segment.
+2. **Quality / maturity of the lead's existing website** — derived from `src/services/lead-study.service.ts` audits (`designAudit`, `copyAudit`, `conversionAudit`). A polished existing site means the bar to "obviously better" is higher → higher difficulty. A 2008-era template with no booking flow → lower difficulty.
+3. **Estimated build effort (operator hours)** — operator's expected hands-on time beyond the AI draft. Set by the operator on the draft view; biggest single driver of difficulty.
+
+The operator sees the computed difficulty and the resulting price on the draft view and can override the difficulty (not the price directly) before approval. `priceCents` is locked at approval time from `segment` + `difficulty`, identically to how it was previously locked from `finalTier`.
 
 ## Accessibility & Inclusion
 
