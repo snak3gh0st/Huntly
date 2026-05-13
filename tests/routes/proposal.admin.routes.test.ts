@@ -266,8 +266,15 @@ describe('POST /api/proposals/:id/approve', () => {
     );
   });
 
-  it('returns 400 with missing-field list when finalTier or paymentLinkUrl unset', async () => {
-    mockProposalFindById.mockResolvedValue({ ...READY, finalTier: null, paymentLinkUrl: null });
+  it('returns 400 with missing-field list when tier/segment or paymentLinkUrl unset', async () => {
+    mockProposalFindById.mockResolvedValue({
+      ...READY,
+      finalTier: null,
+      segmentIndustry: null,
+      segmentSize: null,
+      difficulty: null,
+      paymentLinkUrl: null,
+    });
 
     const res = await app.inject({
       method: 'POST',
@@ -277,7 +284,40 @@ describe('POST /api/proposals/:id/approve', () => {
 
     expect(res.statusCode).toBe(400);
     const body = JSON.parse(res.body);
-    expect(body.missing).toEqual(expect.arrayContaining(['finalTier', 'paymentLinkUrl']));
+    expect(body.missing).toEqual(expect.arrayContaining([
+      'finalTier or (segmentIndustry, segmentSize, difficulty)',
+      'paymentLinkUrl',
+    ]));
+  });
+
+  it('locks priceCents via segment × difficulty when those fields are set', async () => {
+    mockProposalFindById.mockResolvedValue({
+      ...READY,
+      finalTier: null,
+      segmentIndustry: 'other',
+      segmentSize: 'M',
+      difficulty: 0.5,
+    });
+    mockProposalUpdateIfStatusIn.mockResolvedValue({
+      ...READY,
+      status: 'approved',
+      priceCents: 59700,
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/proposals/p1/approve',
+      headers: AUTH,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockProposalUpdateIfStatusIn).toHaveBeenCalledWith(
+      'p1',
+      ['draft'],
+      // Degenerate range for other/M (min === max === 59700), so any difficulty
+      // value lands on the same number — verifies the segment path is taken.
+      expect.objectContaining({ status: 'approved', priceCents: 59700 }),
+    );
   });
 
   it('returns 409 when status not draft', async () => {

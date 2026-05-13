@@ -3,7 +3,15 @@ import { apiKeyAuth } from '../middleware/api-key-auth.js';
 import { proposalRepo, leadRepo } from '../db/index.js';
 import { proposalQueue } from '../workers/proposal.worker.js';
 import { makeToken, makeSlug } from '../lib/slug.js';
-import { priceForTier, type Tier } from '../lib/pricing-tiers.js';
+import {
+  priceForTier,
+  priceForSegment,
+  PRICE_MATRIX,
+  KNOWN_INDUSTRIES,
+  type Tier,
+  type SizeBand,
+  type Segment,
+} from '../lib/pricing-tiers.js';
 import {
   sendProposalOfferEmail,
   sendSiteDeliveredEmail,
@@ -27,6 +35,11 @@ interface GenerateBody {
 
 export default async function proposalAdminRoutes(app: FastifyInstance) {
   app.addHook('onRequest', apiKeyAuth);
+
+  /* GET /api/pricing/matrix — operator UI reads the same matrix the server uses */
+  app.get('/pricing/matrix', async () => {
+    return { matrix: PRICE_MATRIX, industries: KNOWN_INDUSTRIES };
+  });
 
   /* POST /api/leads/:id/proposals — generate */
   app.post<{ Params: { id: string }; Body: GenerateBody }>(
@@ -98,13 +111,22 @@ export default async function proposalAdminRoutes(app: FastifyInstance) {
 
       // For deployed proposals, show the live site (no sales chrome).
       // For all other reviewable statuses (draft/approved/accepted/paid), show the proposal view.
+      const leadForRenderer = {
+        businessName:      proposal.lead.businessName,
+        phone:             (proposal.lead as unknown as { phone?: string | null }).phone ?? null,
+        email:             (proposal.lead as unknown as { email?: string | null }).email ?? null,
+        googleRating:      (proposal.lead as unknown as { googleRating?: number | null }).googleRating ?? null,
+        googleReviewCount: (proposal.lead as unknown as { googleReviewCount?: number | null }).googleReviewCount ?? null,
+        category:          (proposal.lead as unknown as { category?: string | null }).category ?? null,
+      };
+
       const html = proposal.status === 'deployed'
-        ? renderLiveSite({
-            lead: { businessName: proposal.lead.businessName },
+        ? await renderLiveSite({
+            lead: leadForRenderer,
             content: proposal.content as unknown as SiteContent,
           })
-        : renderProposalView({
-            lead: { businessName: proposal.lead.businessName },
+        : await renderProposalView({
+            lead: leadForRenderer,
             proposal: {
               token: proposal.token,
               finalTier: (proposal.finalTier ?? null) as Tier | null,
@@ -120,9 +142,13 @@ export default async function proposalAdminRoutes(app: FastifyInstance) {
 
   /* PATCH /api/proposals/:id */
   const VALID_TIERS = new Set<Tier>(['Starter', 'Pro', 'Premium']);
+  const VALID_SIZES = new Set<SizeBand>(['S', 'M', 'L']);
 
   interface PatchBody {
     finalTier?: string;
+    segmentIndustry?: string | null;
+    segmentSize?: string | null;
+    difficulty?: number | null;
     paymentLinkUrl?: string | null;
     content?: unknown;
   }
@@ -139,6 +165,26 @@ export default async function proposalAdminRoutes(app: FastifyInstance) {
           return reply.status(400).send({ error: 'Invalid tier', valid: [...VALID_TIERS] });
         }
         data.finalTier = request.body.finalTier;
+      }
+      if (request.body.segmentIndustry !== undefined) {
+        data.segmentIndustry = request.body.segmentIndustry;
+      }
+      if (request.body.segmentSize !== undefined) {
+        if (request.body.segmentSize !== null && !VALID_SIZES.has(request.body.segmentSize as SizeBand)) {
+          return reply.status(400).send({ error: 'Invalid segmentSize', valid: [...VALID_SIZES] });
+        }
+        data.segmentSize = request.body.segmentSize;
+      }
+      if (request.body.difficulty !== undefined) {
+        if (request.body.difficulty !== null) {
+          if (typeof request.body.difficulty !== 'number' || !Number.isFinite(request.body.difficulty)) {
+            return reply.status(400).send({ error: 'difficulty must be a finite number in [0, 1]' });
+          }
+          if (request.body.difficulty < 0 || request.body.difficulty > 1) {
+            return reply.status(400).send({ error: 'difficulty must be in [0, 1]' });
+          }
+        }
+        data.difficulty = request.body.difficulty;
       }
       if (request.body.paymentLinkUrl !== undefined) {
         data.paymentLinkUrl = request.body.paymentLinkUrl;
@@ -182,14 +228,27 @@ export default async function proposalAdminRoutes(app: FastifyInstance) {
       const proposal = await proposalRepo.findById(request.params.id);
       if (!proposal) return reply.status(404).send({ error: 'Not found' });
 
+      // Prefer the new segment × difficulty path when all three fields are set.
+      // Fall back to the legacy finalTier path when only finalTier is set.
+      const hasSegment = !!proposal.segmentIndustry
+        && !!proposal.segmentSize
+        && proposal.difficulty !== null
+        && proposal.difficulty !== undefined;
+
       const missing: string[] = [];
-      if (!proposal.finalTier)      missing.push('finalTier');
-      if (!proposal.paymentLinkUrl) missing.push('paymentLinkUrl');
+      if (!hasSegment && !proposal.finalTier) missing.push('finalTier or (segmentIndustry, segmentSize, difficulty)');
+      if (!proposal.paymentLinkUrl)            missing.push('paymentLinkUrl');
       if (missing.length > 0) {
         return reply.status(400).send({ error: 'Missing required fields', missing });
       }
 
-      const priceCents = priceForTier(proposal.finalTier as Tier);
+      const priceCents = hasSegment
+        ? priceForSegment(
+            { industry: proposal.segmentIndustry!, size: proposal.segmentSize! as SizeBand } satisfies Segment,
+            proposal.difficulty!,
+          )
+        : priceForTier(proposal.finalTier as Tier);
+
       const updated = await proposalRepo.updateIfStatusIn(
         request.params.id,
         ['draft'],

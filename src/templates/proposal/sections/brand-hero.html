@@ -1,6 +1,18 @@
-<section class="brand-hero">
-  <p class="hero-eyebrow">Your new site</p>
-  <h1 class="hero-name">{{business_name}}</h1>
-  <p class="hero-tagline">{{tagline}}</p>
-  <p class="hero-description">{{description}}</p>
+<section class="brand-hero" aria-label="Hero">
+  <div {{hero_bg_attrs}} role="img" aria-label="{{hero_img_alt}}">
+    <div class="hero-overlay"></div>
+    <div class="hero-layout">
+      <div class="hero-content">
+        <p class="hero-eyebrow">{{hero_eyebrow}}</p>
+        <hr class="hero-rule" aria-hidden="true">
+        <h1 class="hero-name">{{business_name}}</h1>
+        <p class="hero-tagline">{{tagline}}</p>
+        <div class="hero-actions">
+          <a href="{{cta_href}}" class="hero-cta">{{cta_label}} &#8594;</a>
+          {{secondary_cta}}
+        </div>
+      </div>
+    </div>
+    {{hero_attribution}}
+  </div>
 </section>

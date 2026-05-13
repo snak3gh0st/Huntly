@@ -5,7 +5,13 @@ import {
   generateSiteContent,
   type GeneratorInput,
 } from '../services/proposal-generator.service.js';
-import { suggestTier } from '../lib/pricing-tiers.js';
+import { studyLead } from '../services/lead-study.service.js';
+import { strategize } from '../services/lead-strategy.service.js';
+import { pickVisualSystem } from '../services/visual-system.service.js';
+import { designDirection } from '../services/design-direction.service.js';
+import { generateHeroImage, buildHeroImagePrompt, buildAboutImagePrompt, buildFeaturedServiceImagePrompt, buildCtaBannerImagePrompt } from '../lib/dalle.js';
+import { critiquePass } from '../services/critique-pass.service.js';
+import { suggestTier, suggestSegment } from '../lib/pricing-tiers.js';
 import type { Prisma } from '@prisma/client';
 
 const connection = redis as unknown as ConnectionOptions;
@@ -48,11 +54,93 @@ export async function runProposalJob(data: ProposalJobData): Promise<void> {
   };
 
   try {
-    const content = await generateSiteContent(input);
+    // Layer 1 — Study the lead's website and business context
+    const study = await studyLead(input);
+
+    // Layer 2 — Strategize: derive hero angle, conversion opportunities, copy tone
+    //           Uses Claude Opus for higher-quality reasoning on hero angle.
+    const strategy = await strategize(input, study);
+
+    // Layer 2.5 — Visual system: pick palette + font pairing that fits this lead
+    const visualSystem = await pickVisualSystem(study, strategy);
+
+    // Layer 2.6 — DALL-E 3 hero image (best-effort; null = fall back to Unsplash)
+    // Prompt is derived from locationContext + copyTone + palette mood.
+    // Known limitation: DALL-E 3 URLs expire ~60 min (OpenAI policy).
+    // v2 fix: download + re-host on Huntly static assets / Cloudflare R2.
+    const heroImagePrompt = buildHeroImagePrompt(
+      study.business.locationContext,
+      strategy.copyTone,
+      visualSystem.paletteKey,
+    );
+    const heroImage = await generateHeroImage(heroImagePrompt);
+
+    // Layer 2.7 — Design Direction: senior-designer Figma-thinking pass.
+    // Decides which sections this lead earns, in what order, with what
+    // visual treatment + microcopy voice + signature moves.
+    const direction = await designDirection(study, strategy, visualSystem);
+
+    // Layer 3 — Build: generate final site content grounded in study + strategy + direction
+    const siteContent = await generateSiteContent(input, study, strategy, direction);
+
+    // Layer 4 — Critique: Claude reviews its own output and applies targeted fixes
+    const { critique, appliedContent } = await critiquePass(siteContent, study, strategy);
+
+    // Layer 2.6b — Three additional DALL-E images: about section, featured service, cta-banner.
+    // Serialized (NOT parallel) to stay under DALL-E 3 rate limits — Tier 1 OpenAI
+    // accounts cap DALL-E at 5 req/min and Promise.all here would burst 3 calls plus
+    // the hero call landing within the same window, triggering 429s. Sequential adds
+    // ~30s latency but reliably lands all 4 images.
+    const featuredServiceTitle = appliedContent.services?.[0]?.title ?? siteContent.services[0]?.title ?? '';
+
+    const aboutImage = await generateHeroImage(buildAboutImagePrompt(
+      input.category,
+      strategy.heroAngle,
+      visualSystem.paletteKey,
+    ), '1024x1024');
+
+    const featuredServiceImage = await generateHeroImage(buildFeaturedServiceImagePrompt(
+      featuredServiceTitle,
+      visualSystem.paletteKey,
+    ), '1024x1024');
+
+    const ctaBannerImage = await generateHeroImage(buildCtaBannerImagePrompt(
+      input.category,
+      study.business.locationContext,
+    ), '1792x1024');
+
+    // Merge additional image URLs into content. These are post-Build additions —
+    // they are not part of the Zod-validated SiteContent schema intentionally.
+    const enrichedContent = {
+      ...appliedContent,
+      aboutImageUrl: aboutImage?.url ?? null,
+      ctaBannerImageUrl: ctaBannerImage?.url ?? null,
+      services: appliedContent.services.map((s, i) =>
+        i === 0 ? { ...s, featuredImageUrl: featuredServiceImage?.url ?? null } : s,
+      ),
+    };
+
+    const suggested = suggestSegment({
+      category: lead.category,
+      googleReviewCount: lead.googleReviewCount,
+    });
+
     await proposalRepo.update(data.proposalId, {
       status: 'draft',
-      content: content as unknown as Prisma.InputJsonValue,
+      // Store all layers. Renderer reads SiteContent fields + _study/_strategy/_visualSystem.
+      // _critique is stored for operator inspection. heroImageUrl for direct renderer access.
+      content: {
+        _study: study,
+        _strategy: strategy,
+        _visualSystem: visualSystem,
+        _direction: direction,
+        _critique: critique,
+        heroImageUrl: heroImage?.url ?? null,
+        ...enrichedContent,
+      } as unknown as Prisma.InputJsonValue,
       suggestedTier: suggestTier(lead.googleReviewCount),
+      segmentIndustry: suggested.industry,
+      segmentSize: suggested.size,
       generationError: null,
     });
   } catch (err) {

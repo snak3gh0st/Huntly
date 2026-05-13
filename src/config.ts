@@ -23,6 +23,7 @@ export const env = cleanEnv(process.env, {
   NODE_ENV: str({ choices: ['development', 'production', 'test'], default: 'development' }),
   PORT: num({ default: 3002 }),
   EMAIL_ENABLED: bool({ default: false }),
+  UNSPLASH_ACCESS_KEY: str({ default: '' }),
 });
 
 /** Resolved sites base URL — falls back to BASE_URL when SITES_BASE_URL is unset. */

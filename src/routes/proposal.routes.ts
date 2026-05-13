@@ -39,8 +39,15 @@ export default async function proposalRoutes(app: FastifyInstance) {
       return reply.status(404).type('text/html').send('<h1>Not found</h1>');
     }
 
-    const html = renderProposalView({
-      lead: { businessName: proposal.lead.businessName },
+    const html = await renderProposalView({
+      lead: {
+        businessName:      proposal.lead.businessName,
+        phone:             proposal.lead.phone ?? null,
+        email:             proposal.lead.email ?? null,
+        googleRating:      (proposal.lead as unknown as { googleRating?: number | null }).googleRating ?? null,
+        googleReviewCount: (proposal.lead as unknown as { googleReviewCount?: number | null }).googleReviewCount ?? null,
+        category:          (proposal.lead as unknown as { category?: string | null }).category ?? null,
+      },
       proposal: {
         token: proposal.token,
         finalTier: (proposal.finalTier ?? null) as 'Starter' | 'Pro' | 'Premium' | null,
@@ -121,8 +128,15 @@ export default async function proposalRoutes(app: FastifyInstance) {
       return reply.status(404).type('text/html').send('<h1>Not found</h1>');
     }
 
-    const html = renderLiveSite({
-      lead: { businessName: proposal.lead.businessName },
+    const html = await renderLiveSite({
+      lead: {
+        businessName:      proposal.lead.businessName,
+        phone:             proposal.lead.phone ?? null,
+        email:             proposal.lead.email ?? null,
+        googleRating:      (proposal.lead as unknown as { googleRating?: number | null }).googleRating ?? null,
+        googleReviewCount: (proposal.lead as unknown as { googleReviewCount?: number | null }).googleReviewCount ?? null,
+        category:          (proposal.lead as unknown as { category?: string | null }).category ?? null,
+      },
       content: proposal.content as unknown as SiteContent,
     });
 

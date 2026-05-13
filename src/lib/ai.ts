@@ -57,6 +57,18 @@ export interface AiCallOptions {
   systemPrompt: string;
   userPrompt: string;
   json?: boolean;
+  /** Override the Anthropic model (default: claude-sonnet-4-6). */
+  model?: string;
+}
+
+/** Options for vision-capable Anthropic calls with an optional image block. */
+export interface AnthropicVisionOptions {
+  systemPrompt: string;
+  userPrompt: string;
+  imageBase64?: string;
+  imageMimeType?: string;
+  json?: boolean;
+  model?: string;
 }
 
 type Provider = 'ollama' | 'groq' | 'openai';
@@ -126,10 +138,15 @@ async function callAnthropic(opts: AiCallOptions): Promise<string> {
     ? `${opts.userPrompt}\n\nReturn ONLY valid JSON. No prose, no markdown fences.`
     : opts.userPrompt;
 
+  const model = opts.model ?? 'claude-sonnet-4-6';
+
+  // Opus 4.7+ deprecated the `temperature` parameter — only set it for older Sonnet/Haiku.
+  const supportsTemperature = !/opus-4-[7-9]|opus-[5-9]/.test(model);
+
   const res = await anthropicClient().messages.create({
-    model: 'claude-sonnet-4-6',
+    model,
     max_tokens: 4096,
-    temperature: 0.4,
+    ...(supportsTemperature ? { temperature: 0.4 } : {}),
     system: opts.systemPrompt,
     messages: [{ role: 'user', content: userPrompt }],
   });
@@ -138,6 +155,61 @@ async function callAnthropic(opts: AiCallOptions): Promise<string> {
   const text = block && block.type === 'text' ? block.text : '';
   if (opts.json && !text.trim()) {
     throw new Error('Anthropic returned empty response in JSON mode');
+  }
+  return text;
+}
+
+/**
+ * Vision-capable Anthropic call. Sends an optional image block before the text prompt.
+ * Falls back to text-only if no image is provided. Always uses Anthropic directly —
+ * no fallback chain, since vision is Anthropic-specific in this pipeline.
+ */
+export async function callAnthropicVision(opts: AnthropicVisionOptions): Promise<string> {
+  const userText = opts.json
+    ? `${opts.userPrompt}\n\nReturn ONLY valid JSON. No prose, no markdown fences.`
+    : opts.userPrompt;
+
+  const model = opts.model ?? 'claude-sonnet-4-6';
+
+  type SupportedMimeType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+  type ContentBlock =
+    | { type: 'image'; source: { type: 'base64'; media_type: SupportedMimeType; data: string } }
+    | { type: 'text'; text: string };
+
+  const contentBlocks: ContentBlock[] = [];
+
+  if (opts.imageBase64 && opts.imageMimeType) {
+    // Only push the image block if the mime type is one Anthropic supports
+    const supportedTypes: SupportedMimeType[] = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    const mimeType = opts.imageMimeType as SupportedMimeType;
+    if (supportedTypes.includes(mimeType)) {
+      contentBlocks.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: mimeType,
+          data: opts.imageBase64,
+        },
+      });
+    }
+  }
+
+  contentBlocks.push({ type: 'text', text: userText });
+
+  const supportsTemperature = !/opus-4-[7-9]|opus-[5-9]/.test(model);
+
+  const res = await anthropicClient().messages.create({
+    model,
+    max_tokens: 4096,
+    ...(supportsTemperature ? { temperature: 0.4 } : {}),
+    system: opts.systemPrompt,
+    messages: [{ role: 'user', content: contentBlocks }],
+  });
+
+  const block = res.content[0];
+  const text = block && block.type === 'text' ? block.text : '';
+  if (opts.json && !text.trim()) {
+    throw new Error('Anthropic vision call returned empty response in JSON mode');
   }
   return text;
 }
@@ -198,6 +270,8 @@ export async function callAI(opts: AiCallOptions): Promise<string> {
  * Call a specific provider, bypassing the runtime-configured fallback chain.
  * Use for paths that must NOT silently fall back (e.g. proposal generation must
  * use Claude — falling back to a weaker model defeats the purpose).
+ *
+ * Pass `opts.model` to override the default model for Anthropic calls.
  */
 export async function callAIWithProvider(
   provider: 'ollama' | 'groq' | 'openai' | 'anthropic',

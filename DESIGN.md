@@ -56,20 +56,29 @@ price       clamp(3rem, 6vw + 1rem, 5.5rem)      Fraunces 600   line-height 1.0 
 
 ## Layout
 
-**Container:** single-column reading flow, max-width `min(640px, calc(100% - 3rem))`, horizontally centered. No nested cards. No sidebars on the lead-facing pages.
+**Container:** most sections use `max-width: min(960px, calc(100% - 3rem))`. The sales section and CTA form remain at `min(640px, calc(100% - 3rem))` for a focused reading width. No nested cards. No sidebars on the lead-facing pages.
+
+**Section order** (updated 2026-05):
+
+```
+hero → stats (optional) → why-us (optional, _study.uniqueAngles >= 2)
+     → services → what-changes (optional, _strategy.conversionOpportunities >= 2)
+     → testimonials → contact → sales (proposal-only) → footer
+```
 
 **Vertical rhythm** (not uniform — deliberately varied to create rhythm):
 
 ```
-hero          → diagnosis    : 4rem
-diagnosis     → brand        : 5rem
-brand         → services     : 4rem
-services      → testimonials : 5rem
-testimonials  → contact      : 4rem
-contact       → pricing      : 6rem  (reset before the close)
-pricing       → cta-form     : 2.5rem
-cta-form      → footer       : 6rem
+hero          → stats         : 0 (adjacent)
+stats         → why-us        : 0 (adjacent)
+why-us        → services      : 0 (full-bleed bg change)
+services      → what-changes  : 0 (hairline divider)
+what-changes  → testimonials  : 0 (hairline divider)
+testimonials  → contact       : 0 (hairline divider)
+contact       → sales         : 0 (full-bleed bg change)
 ```
+
+Section inner padding is `5rem` block (was 4rem). Hero is 90vh min desktop, 75vh mobile.
 
 Within sections, paragraph rhythm is `0.75em` between paragraphs, `1.5em` before a fresh heading.
 
@@ -78,33 +87,72 @@ Within sections, paragraph rhythm is `0.75em` between paragraphs, `1.5em` before
 ## Components
 
 ### Hero
-- Eyebrow: small caps Inter 500 in `--ink-quiet`, set to ~1rem below the display heading.
-- Display heading: Fraunces 600, business name. Optical size matters — load opsz≥48 axis.
-- Tagline: body+1 (1.25rem), `--ink-muted`, 1.5rem below the display.
-- Description: body, `--ink`, capped at 62ch.
+- Full-width section, min 90vh desktop / 75vh mobile. Unsplash background image with OKLCH-tinted gradient overlay (`oklch(0.10 0.015 50 / 0.08)` to `oklch(0.10 0.015 50 / 0.55)`) plus an inset bottom shadow (`oklch(0.10 0.015 50 / 0.45)`) for legibility. If no image: plain `--surface` background.
+- **Business name** (not tagline) is the display heading. Fraunces 600 at `clamp(3.5rem, 9vw + 1rem, 9rem)`, line-height 0.95, letter-spacing -0.03em. Tagline moves to a paragraph below.
+- Eyebrow: small caps Inter 500, `{category} · {city}` derived from `_study.business.locationContext`. White on image, `--accent` color on plain surface.
+- Thin horizontal rule (1px, 32px) between eyebrow and headline.
+- Primary CTA: Fraunces 600 1.125rem, `--ink` bg, `--bg` text. Secondary quiet link to `#why`.
+- Content in left 60% of a wide container (max 1100px), collapsing to 100% on mobile.
+- Unsplash attribution: `0.6875rem` white 55% opacity link bottom-right. Required by Unsplash TOS.
+
+### Sticky nav
+- Position sticky, 56px height, 1px border-bottom `--border`. Backdrop-blur via `@supports` query (falls back to solid `--bg`).
+- Business name in Fraunces 600 left side. Links (Why us / Services / Reviews / Contact) in center. CTA button (`--ink` bg, Fraunces 600 1rem) right.
+- Active section highlighted via `aria-current="true"` + 1.5px solid underline in `--ink` (IntersectionObserver scrollspy).
+- Mobile (640px and below): links + desktop CTA hidden; hamburger button shown. Tapping hamburger opens full-screen overlay with Fraunces display nav links.
+- Mobile overlay closes on link tap, backdrop tap, or Escape key.
+
+### Stats strip (optional)
+- Rendered only when `content.stats !== null` AND lead has googleRating + googleReviewCount.
+- `--surface` background, `padding-block: 2.5rem`. 3-column grid (rating | review count | optional `thirdMetric`). Each column: Fraunces 600 numeral + small caps caption.
+- `stats.thirdMetric` is optional (`string<=60`): "12 years in Austin", "Bilingual service", etc. Renders as text in a smaller numeral size.
+
+### Why Us section (optional)
+- Rendered only when `_study.business.uniqueAngles` has at least 2 items.
+- Full-bleed `--accent-quiet` background, 6rem padding. Wide container (960px).
+- Each angle: Fraunces 600 numeral ("01", "02") in `--ink-quiet` at clamp(2.5–4rem) on left, body text (1.125rem) on right.
+- Odd-indexed items shift right by 2rem (staggered asymmetry). Collapses to no offset on mobile.
 
 ### Diagnosis bullets
-- NOT cards. Inline blocks separated by a thin top border (`1px solid --border`).
-- Icon: 18px stroke icon in `--accent`, sits flush-left of the label.
+- NOT icons. Numbers ("01", "02") in Fraunces 600 1.75rem `--ink-quiet` on left.
 - Label: Inter 600.
-- Evidence: Inter 400 in `--ink-muted`, indented under the label by the icon width.
-- Stack with 1.25rem vertical gap. First item has no top border.
+- Evidence: Inter 400 in `--ink-muted`.
+- Stack separated by 1px top border. First item has no top border.
 
 ### Services
-- 2-column grid on viewports ≥640px (single column below).
-- No cards. Type-only blocks.
-- Service title: Inter 600, body+1 (1.125rem). Optional small icon inline at title baseline (16px, currentColor, no accent).
-- Service description: body, `--ink-muted`. Max 200 chars.
-- Grid gap: 2rem column, 2.5rem row.
+- Section with `--surface` background.
+- **Service 01** (featured): displayed with icon badge + Fraunces display title (clamp 1.375–1.75rem) + expandable `<details>`/`<summary>` description.
+- **Services 02+**: numbered rows (Fraunces "02", "03" in `--ink-quiet` clamp 2–3rem) + Inter 600 title + expandable `<details>` description. Hairline dividers between rows.
+- `<details>`/`<summary>` with CSS chevron rotation at `details[open]`. No JS required.
+
+### What Changes section (optional)
+- Rendered only when `_strategy.conversionOpportunities` has at least 2 items.
+- Each row: 3-column grid (`1fr auto 1fr`): "Today" gap text (muted) → arrow → "New site" fix text (primary weight). Hairline top borders between rows.
+- Mobile: single column, arrow hidden.
 
 ### Testimonials
-- Pull-quote treatment. Fraunces 600, italic, body+1 (1.25rem). Curly quotes via `&ldquo;…&rdquo;`.
-- Attribution: Inter 500 small caps, `--ink-quiet`, leading em-dash typeset as `—`.
-- Stack with 2rem gap. No cards, no boxed backgrounds.
+- Pull-quote treatment. 5 star glyphs in `--accent` above each quote (letter-spacing: 0.1em).
+- Fraunces 600 italic at `clamp(1.5rem, 2vw + 1rem, 2.25rem)`. Large curly-quote glyph (`&ldquo;`) positioned absolute top-left in `--accent` at 3.5rem, opacity 0.7.
+- Attribution: Inter 500 small caps, `--ink-quiet`.
+- "Read more on Google →" link below attribution. Stack with 3rem gap.
+
+### Section reveal motion (updated 2026-05)
+**NOTE: This intentionally deviates from the previous DESIGN.md rule of "no fade-in / page must paint in one frame."** The user explicitly requested designed reveal motion. The new rule:
+- JS adds `.js-reveal-enabled` to `<html>` on load. Only then do sections get `opacity:0; transform:translateY(20px)`.
+- IntersectionObserver (threshold 0.1) adds `.in-view` triggering a 700ms cubic-bezier(0.16,1,0.3,1) transition.
+- Hero (first `<section>`) is always exempt — never animated (it's LCP).
+- Gated behind `prefers-reduced-motion: no-preference`. No motion when reduced-motion is requested.
+- JS-disabled users see no opacity:0 — visible content always rendered.
 
 ### Contact
-- Definition-list pattern. `<dl>` with `<dt>` (caption style — small caps, `--ink-quiet`) and `<dd>` (body, `--ink`).
-- 2-column grid on viewports ≥640px (label column auto, value column 1fr) — but rendered as a single visual rhythm, not boxed.
+- Section with `--surface` background. 2-column desktop: `<dl>` card left, Google Maps iframe right (if address known).
+- Definition-list: `<dt>` caption style (small caps, `--ink-quiet`), `<dd>` body `--ink`.
+- Map: `<iframe src="https://www.google.com/maps?q=...&output=embed">` 280px height, 8px border-radius.
+
+### Sales section (proposal-only)
+- Full-bleed `--accent-quiet` background visually marking it as the sales chrome.
+- Contains: caption "Draft preview", h2 "Want to publish this site for [Business]?", then diagnosis bullets, pricing, accept form.
+- Max-width 640px container inside.
 
 ### Pricing
 - Single block, no card. Tier label in caption style (small caps `--ink-quiet`) above the price.
@@ -118,17 +166,30 @@ Within sections, paragraph rhythm is `0.75em` between paragraphs, `1.5em` before
 - Primary button: Fraunces 600 at body+2, container `--ink` background, `--bg` text, 12px vertical padding, no border-radius shouting. Hover: `--ink` lightens to `oklch(0.30 0.015 50)`. No gradient.
 - Optional secondary payment-link link sits below the primary, styled as a quiet text link with underline.
 
+### Contact
+- Section with `--surface` background. 2-column on desktop (`2fr 3fr`): left = contact card (`<dl>`) with `section-caption` + `section-heading` + address/phone/hours; right = Google Maps iframe (400px height, 8px border-radius).
+- Mobile: stacks single column.
+
 ### Footer
-- One line. Inter 400 small in `--ink-quiet`. "Site by Huntly" with link to huntly.app.
-- Centered or flush-left (matches the body alignment).
+- Multi-column on desktop (`2fr 1fr 1fr 1fr`). `--surface` background, `padding-block: 3rem`.
+  - Col 1: business name (Fraunces 600) + tagline (small, `--ink-quiet`).
+  - Col 2: "Services" label + anchor list for each service.
+  - Col 3: "Contact" label + address + phone.
+  - Col 4: "Built by" + Huntly link + optional Unsplash attribution.
+- Single column stacked on mobile.
 
 ## Motion
 
 Minimal. The page is read, not navigated.
 
 - `prefers-reduced-motion: reduce` disables all motion.
-- Hover transitions on links/buttons: `transition: color 120ms ease-out, background-color 120ms ease-out` only. No transform, no shadow.
-- The page must paint within one frame after navigation. No fade-in. No skeleton.
+- Hover transitions on links/buttons: `transition: color 120ms ease-out, background-color 120ms ease-out` only.
+- **Section reveals** now included (see "Section reveal motion" above) but gated behind JS + reduced-motion check.
+- `scroll-behavior: smooth` on `html` inside a `prefers-reduced-motion: no-preference` media query.
+- No skeleton loaders, no page-entry fade (hero excluded from reveal).
+
+### Scroll behavior
+- `scroll-margin-top` on all `section[id]` equals sticky nav height (+ draft banner height on proposal view) so anchored sections clear the nav when scrolled to.
 
 ## Bans (project-specific reinforcements over the shared design laws)
 
@@ -137,4 +198,4 @@ Minimal. The page is read, not navigated.
 - No "trusted by" logo strips, no fabricated stat counters, no countdown timers, no chatbot bubbles.
 - No `background-clip: text` gradient text anywhere.
 - No emoji used as a UI element (icons must be SVG).
-- No images of people or businesses (we have no photo budget per lead).
+- Hero image and CTA button required. Image sourced from Unsplash per vertical using `hero.imageQuery`. No stock photos of people directly addressing the camera (no "smiling dentist", no "happy customer facing lens"). Aim for interior/exterior spaces, professional environments, or tools of the trade.
