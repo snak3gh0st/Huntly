@@ -127,13 +127,6 @@ function renderContact(content: SiteContent): string {
   });
 }
 
-function renderProposalIntro(content: SiteContent): string {
-  return substitute(loadTemplate('sections/proposal-intro.html'), {
-    salutation: escapeHtml(content.proposalIntro.salutation),
-    pitch: escapeHtml(content.proposalIntro.pitch),
-  });
-}
-
 function renderDiagnosis(content: SiteContent): string {
   const bullets = content.diagnosis.bullets
     .map((b) => `
@@ -214,14 +207,18 @@ export function renderProposalView(args: {
   };
   content: SiteContent;
 }): string {
+  // Order: site mockup (brand_hero → contact) reads first as the lead's actual
+  // new website. Then diagnosis ("what your current site is missing") sets up
+  // urgency. Pricing + accept close the deal. The `proposalIntro` field still
+  // exists in the schema (and the AI fills it) but is intentionally not rendered
+  // — the draft-banner in the shell handles that framing more quietly.
   return substitute(loadTemplate('proposal-shell.html'), {
     business_name: escapeHtml(args.lead.businessName),
-    proposal_intro: renderProposalIntro(args.content),
-    diagnosis: renderDiagnosis(args.content),
     brand_hero: renderBrandHero(args.content, args.lead),
     services: renderServices(args.content),
     testimonials: renderTestimonials(args.content),
     contact: renderContact(args.content),
+    diagnosis: renderDiagnosis(args.content),
     pricing: renderPricing(args.content, args.proposal),
     cta_form: renderCtaForm(args.content, args.proposal),
     site_footer: renderFooter(),

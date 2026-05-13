@@ -75,15 +75,47 @@
     }
 
     /* ── Vertical rhythm — per-section margin-top ─────── */
-    .proposal-intro                    { /* first — no margin-top */ }
-    .diagnosis-section                 { margin-top: 4rem; }
-    .brand-hero                        { margin-top: 5rem; }
+    /* Order: site mockup first (hero → contact), then diagnosis ("what you're missing"),
+       then pricing + accept. The lead reads it like their actual website, then is shown
+       the gap between today's site and the mockup, then is asked to buy. */
+    .brand-hero                        { /* first — no margin-top */ }
     .services-section                  { margin-top: 4rem; }
     .testimonials-section              { margin-top: 5rem; }
     .contact-section                   { margin-top: 4rem; }
-    .pricing-section                   { margin-top: 6rem; }
+    .diagnosis-section                 { margin-top: 6rem; padding-top: 4rem; border-top: 1px solid var(--border); }
+    .pricing-section                   { margin-top: 5rem; }
     .cta-form-section                  { margin-top: 2.5rem; }
     .page-footer                       { margin-top: 6rem; }
+
+    /* ── Draft banner (thin sticky top bar replacing the old "Hi team" intro) ─── */
+    .draft-banner {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0.5rem 1rem;
+      display: flex;
+      justify-content: center;
+      align-items: baseline;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-quiet);
+    }
+    .draft-banner-mark {
+      color: var(--accent);
+      font-size: 0.6rem;
+    }
+    .draft-banner-body {
+      color: var(--ink);
+      text-transform: none;
+      letter-spacing: 0;
+      font-weight: 400;
+    }
 
     /* ── Proposal intro ───────────────────────────────── */
     .proposal-intro {
@@ -537,13 +569,17 @@
   </style>
 </head>
 <body>
+  <aside class="draft-banner" aria-label="Draft preview notice">
+    <span class="draft-banner-mark" aria-hidden="true">◆</span>
+    <span>Draft preview</span>
+    <span class="draft-banner-body">Built for {{business_name}} by Huntly Sites &middot; scroll down to accept</span>
+  </aside>
   <main class="page-container">
-    {{proposal_intro}}
-    {{diagnosis}}
     {{brand_hero}}
     {{services}}
     {{testimonials}}
     {{contact}}
+    {{diagnosis}}
     {{pricing}}
     {{cta_form}}
     {{site_footer}}

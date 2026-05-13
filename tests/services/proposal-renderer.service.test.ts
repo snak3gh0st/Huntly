@@ -52,9 +52,13 @@ describe('renderProposalView', () => {
     expect(html).toContain('<title>Proposal for Smile Family Dental</title>');
   });
 
-  it('renders the proposalIntro salutation', () => {
+  it('renders the draft-preview banner with the business name', () => {
+    // The "Hi Dr. Silva" proposalIntro preamble was removed so the page reads as
+    // the lead's actual new website first. A thin sticky banner replaces it.
     const html = renderProposalView({ lead: LEAD, proposal: PROPOSAL, content: CONTENT });
-    expect(html).toContain('Hi Dr. Silva,');
+    expect(html).toContain('Draft preview');
+    expect(html).toContain('Built for Smile Family Dental');
+    expect(html).not.toContain('Hi Dr. Silva,');  // old preamble must be gone
   });
 
   it('renders all diagnosis bullets', () => {
