@@ -43,6 +43,12 @@ type RichContent = SiteContent & {
   /** DALL-E 3 generated hero image URL. When present, used instead of Unsplash.
    *  Note: URL expires ~60 min per OpenAI policy (known v1 limitation). */
   heroImageUrl?: string | null;
+  /** DALL-E 3 about-section detail/portrait image. Square format. Added post-Build by worker. */
+  aboutImageUrl?: string | null;
+  /** DALL-E 3 CTA banner background image. Landscape. Added post-Build by worker. */
+  ctaBannerImageUrl?: string | null;
+  /** Override services to allow featuredImageUrl on services[0]. Added post-Build by worker. */
+  services: Array<SiteContent['services'][number] & { featuredImageUrl?: string | null }>;
 };
 
 /* ------------------------------------------------------------------ */
@@ -251,16 +257,25 @@ function renderServices(content: RichContent): string {
 
   const featured = services[0];
   // No boxed chip — DESIGN.md bans "icons inside boxed chips on the services section"
-  // Featured service uses the same numeral treatment as supporting rows for visual unity
-  const featuredHtml = `<div class="service-featured">
-  <span class="service-featured-num" aria-hidden="true">01</span>
+  // Featured service: if DALL-E image available, show it as a bleed block above the copy.
+  const featuredImageHtml = featured.featuredImageUrl
+    ? `<div class="service-featured-image-wrap"><img src="${escapeHtml(featured.featuredImageUrl)}" alt="${escapeHtml(featured.title)}" class="service-featured-image" loading="lazy" decoding="async"></div>`
+    : '';
+  // When image is present, wrap num+body in a sub-row so they stay horizontal below the image
+  const innerRow = `<span class="service-featured-num" aria-hidden="true">01</span>
   <div class="service-featured-body">
     <h3 class="service-featured-title">${escapeHtml(featured.title)}</h3>
     <details class="service-details">
       <summary class="service-summary">About this service</summary>
       <p class="service-details-body">${escapeHtml(featured.description)}</p>
     </details>
-  </div>
+  </div>`;
+  const featuredHtml = featured.featuredImageUrl
+    ? `<div class="service-featured service-featured--has-image">
+  ${featuredImageHtml}<div class="service-featured-inner-row">${innerRow}</div>
+</div>`
+    : `<div class="service-featured">
+  ${innerRow}
 </div>`;
 
   const supporting = services.slice(1)
@@ -367,9 +382,21 @@ function renderAbout(
   content: RichContent,
   lead: { businessName: string },
 ): string {
+  const aboutImageUrl = content.aboutImageUrl;
+  if (aboutImageUrl) {
+    // 2-col asymmetric layout: text-left 60%, image-right 40%
+    return substitute(loadTemplate('sections/about.html'), {
+      business_name: escapeHtml(lead.businessName),
+      description:   escapeHtml(content.brand.description),
+      about_image:   `<div class="about-image-col"><img src="${escapeHtml(aboutImageUrl)}" alt="${escapeHtml(lead.businessName)} — detail" class="about-image" loading="lazy" decoding="async"></div>`,
+      layout_class:  'about-inner--two-col',
+    });
+  }
   return substitute(loadTemplate('sections/about.html'), {
     business_name: escapeHtml(lead.businessName),
     description:   escapeHtml(content.brand.description),
+    about_image:   '',
+    layout_class:  '',
   });
 }
 
@@ -438,12 +465,22 @@ function renderCtaBanner(
   ctaHref: string,
 ): string {
   if (!content.ctaBanner) return '';
-  // Use section-specific CTA action — falls back to the same ctaHref
+
+  // Full-bleed background image when available, with dark overlay for legibility
+  const bgStyle = content.ctaBannerImageUrl
+    ? ` style="background-image: url('${escapeHtml(content.ctaBannerImageUrl)}')"`
+    : '';
+  const bannerClass = content.ctaBannerImageUrl
+    ? 'cta-banner-section reveal cta-banner-section--has-image'
+    : 'cta-banner-section reveal';
+
   return substitute(loadTemplate('sections/cta-banner.html'), {
-    headline:    escapeHtml(content.ctaBanner.headline),
-    subheadline: escapeHtml(content.ctaBanner.subheadline),
-    cta_href:    escapeHtml(ctaHref),
-    cta_label:   escapeHtml(content.ctaBanner.ctaLabel),
+    headline:     escapeHtml(content.ctaBanner.headline),
+    subheadline:  escapeHtml(content.ctaBanner.subheadline),
+    cta_href:     escapeHtml(ctaHref),
+    cta_label:    escapeHtml(content.ctaBanner.ctaLabel),
+    banner_class: bannerClass,
+    banner_bg:    bgStyle,
   });
 }
 

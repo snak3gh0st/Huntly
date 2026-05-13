@@ -9,7 +9,7 @@ import { studyLead } from '../services/lead-study.service.js';
 import { strategize } from '../services/lead-strategy.service.js';
 import { pickVisualSystem } from '../services/visual-system.service.js';
 import { designDirection } from '../services/design-direction.service.js';
-import { generateHeroImage, buildHeroImagePrompt } from '../lib/dalle.js';
+import { generateHeroImage, buildHeroImagePrompt, buildAboutImagePrompt, buildFeaturedServiceImagePrompt, buildCtaBannerImagePrompt } from '../lib/dalle.js';
 import { critiquePass } from '../services/critique-pass.service.js';
 import { suggestTier } from '../lib/pricing-tiers.js';
 import type { Prisma } from '@prisma/client';
@@ -86,6 +86,40 @@ export async function runProposalJob(data: ProposalJobData): Promise<void> {
     // Layer 4 — Critique: Claude reviews its own output and applies targeted fixes
     const { critique, appliedContent } = await critiquePass(siteContent, study, strategy);
 
+    // Layer 2.6b — Three additional DALL-E images: about section, featured service, cta-banner.
+    // Generated in parallel after Build so they can reference the final services[0] title.
+    const featuredServiceTitle = appliedContent.services?.[0]?.title ?? siteContent.services[0]?.title ?? '';
+
+    const [aboutImage, featuredServiceImage, ctaBannerImage] = await Promise.all([
+      // Square (1024x1024, ~$0.04) — intimate detail shot, not landscape
+      generateHeroImage(buildAboutImagePrompt(
+        input.category,
+        strategy.heroAngle,
+        visualSystem.paletteKey,
+      ), '1024x1024'),
+      // Square (1024x1024, ~$0.04) — services card, constrained aspect ratio
+      generateHeroImage(buildFeaturedServiceImagePrompt(
+        featuredServiceTitle,
+        visualSystem.paletteKey,
+      ), '1024x1024'),
+      // Landscape (1792x1024, ~$0.08) — full-bleed CTA banner background
+      generateHeroImage(buildCtaBannerImagePrompt(
+        input.category,
+        study.business.locationContext,
+      ), '1792x1024'),
+    ]);
+
+    // Merge additional image URLs into content. These are post-Build additions —
+    // they are not part of the Zod-validated SiteContent schema intentionally.
+    const enrichedContent = {
+      ...appliedContent,
+      aboutImageUrl: aboutImage?.url ?? null,
+      ctaBannerImageUrl: ctaBannerImage?.url ?? null,
+      services: appliedContent.services.map((s, i) =>
+        i === 0 ? { ...s, featuredImageUrl: featuredServiceImage?.url ?? null } : s,
+      ),
+    };
+
     await proposalRepo.update(data.proposalId, {
       status: 'draft',
       // Store all layers. Renderer reads SiteContent fields + _study/_strategy/_visualSystem.
@@ -97,7 +131,7 @@ export async function runProposalJob(data: ProposalJobData): Promise<void> {
         _direction: direction,
         _critique: critique,
         heroImageUrl: heroImage?.url ?? null,
-        ...appliedContent,
+        ...enrichedContent,
       } as unknown as Prisma.InputJsonValue,
       suggestedTier: suggestTier(lead.googleReviewCount),
       generationError: null,

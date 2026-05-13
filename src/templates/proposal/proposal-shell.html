@@ -584,6 +584,35 @@
       border-bottom: 1px solid var(--border);
     }
 
+    /* Featured service image — bleeds above the copy block when present */
+    .service-featured--has-image {
+      flex-direction: column;
+      gap: 0;
+    }
+
+    /* When image is present, the num+body are wrapped in an inner row */
+    .service-featured-inner-row {
+      display: flex;
+      gap: 2rem;
+      align-items: flex-start;
+      width: 100%;
+    }
+
+    .service-featured-image-wrap {
+      width: 100%;
+      border-radius: 4px;
+      overflow: hidden;
+      line-height: 0;
+      margin-bottom: 1.75rem;
+    }
+
+    .service-featured-image {
+      width: 100%;
+      max-height: 320px;
+      object-fit: cover;
+      display: block;
+    }
+
     .service-featured-num {
       font-family: var(--font-display);
       font-weight: 600;
@@ -1186,6 +1215,35 @@
       padding-block: 5rem;
     }
 
+    /* Two-column asymmetric layout when DALL-E about image is present */
+    .about-inner--two-col {
+      display: grid;
+      grid-template-columns: 60% 1fr;
+      gap: 3.5rem;
+      align-items: center;
+    }
+
+    @media (max-width: 700px) {
+      .about-inner--two-col {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+      }
+    }
+
+    .about-text-col { min-width: 0; }
+
+    .about-image-col {
+      position: relative;
+    }
+
+    .about-image {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      object-fit: cover;
+      border-radius: 4px;
+      display: block;
+    }
+
     .about-body {
       margin-top: 1.25rem;
       font-size: 1.125rem;
@@ -1410,9 +1468,31 @@
     .cta-banner-section {
       background: var(--ink);
       color: var(--bg);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* When a background image is present: full-bleed image + dark gradient overlay */
+    .cta-banner-section--has-image {
+      background-size: cover;
+      background-position: center;
+    }
+
+    .cta-banner-overlay {
+      display: none;
+    }
+
+    .cta-banner-section--has-image .cta-banner-overlay {
+      display: block;
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, oklch(0.10 0.010 50 / 0.72), oklch(0.10 0.010 50 / 0.88));
+      pointer-events: none;
     }
 
     .cta-banner-inner {
+      position: relative;
+      z-index: 1;
       max-width: min(960px, calc(100% - 3rem));
       margin-inline: auto;
       padding-block: 4.5rem;
@@ -1425,6 +1505,10 @@
       border-top: 1px solid oklch(0.40 0.010 50);
     }
 
+    .cta-banner-section--has-image .cta-banner-inner {
+      border-top-color: rgba(255, 255, 255, 0.18);
+    }
+
     .cta-banner-text { flex: 1; min-width: 200px; }
 
     /* Small typographic ornament — the diamond mark signals the section break */
@@ -1435,6 +1519,10 @@
       letter-spacing: 0.12em;
       color: oklch(0.62 0.011 55);
       margin-bottom: 1rem;
+    }
+
+    .cta-banner-section--has-image .cta-banner-text::before {
+      color: rgba(255, 255, 255, 0.45);
     }
 
     .cta-banner-heading {
@@ -1452,6 +1540,10 @@
       font-size: 1.0625rem;
       color: oklch(0.92 0.005 60 / 0.7);
       max-width: 52ch;
+    }
+
+    .cta-banner-section--has-image .cta-banner-sub {
+      color: rgba(255, 255, 255, 0.75);
     }
 
     .cta-banner-btn {
