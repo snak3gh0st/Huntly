@@ -27,9 +27,9 @@ const IconSchema = z.enum(ICON_NAMES);
 
 export const SiteContentSchema = z.object({
   brand: z.object({
-    tagline:     z.string().min(1).max(120),
-    description: z.string().min(1).max(500),
-    manifesto:   z.string().min(1).max(220).optional(),
+    tagline:     z.string().min(1).max(160),
+    description: z.string().min(1).max(800),
+    manifesto:   z.string().min(1).max(280).optional(),
   }),
   hero: z.object({
     imageQuery:          z.string().min(1).max(80),
@@ -147,7 +147,7 @@ Output STRICT JSON ONLY, matching this exact schema. No markdown. No prose aroun
 
 Schema:
 {
-  "brand": { "tagline": string<=120, "description": string<=500, "manifesto": string<=220 },
+  "brand": { "tagline": string<=160, "description": string<=800, "manifesto": string<=280 },
   "hero": { "imageQuery": string<=80, "ctaLabel": string<=40, "ctaAction": "call"|"email"|"scroll-to-form", "secondaryCtaLabel": string<=40 (optional, default "See why") },
   "stats": { "showRating": boolean, "showReviewCount": boolean, "thirdMetric": string<=60 (optional, e.g. "12 years in Austin" or "Bilingual service") } | null,
   "services": [ { "icon": IconName, "title": string<=80, "description": string<=320 } ]   // 4 to 8 items
