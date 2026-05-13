@@ -87,27 +87,27 @@ export async function runProposalJob(data: ProposalJobData): Promise<void> {
     const { critique, appliedContent } = await critiquePass(siteContent, study, strategy);
 
     // Layer 2.6b — Three additional DALL-E images: about section, featured service, cta-banner.
-    // Generated in parallel after Build so they can reference the final services[0] title.
+    // Serialized (NOT parallel) to stay under DALL-E 3 rate limits — Tier 1 OpenAI
+    // accounts cap DALL-E at 5 req/min and Promise.all here would burst 3 calls plus
+    // the hero call landing within the same window, triggering 429s. Sequential adds
+    // ~30s latency but reliably lands all 4 images.
     const featuredServiceTitle = appliedContent.services?.[0]?.title ?? siteContent.services[0]?.title ?? '';
 
-    const [aboutImage, featuredServiceImage, ctaBannerImage] = await Promise.all([
-      // Square (1024x1024, ~$0.04) — intimate detail shot, not landscape
-      generateHeroImage(buildAboutImagePrompt(
-        input.category,
-        strategy.heroAngle,
-        visualSystem.paletteKey,
-      ), '1024x1024'),
-      // Square (1024x1024, ~$0.04) — services card, constrained aspect ratio
-      generateHeroImage(buildFeaturedServiceImagePrompt(
-        featuredServiceTitle,
-        visualSystem.paletteKey,
-      ), '1024x1024'),
-      // Landscape (1792x1024, ~$0.08) — full-bleed CTA banner background
-      generateHeroImage(buildCtaBannerImagePrompt(
-        input.category,
-        study.business.locationContext,
-      ), '1792x1024'),
-    ]);
+    const aboutImage = await generateHeroImage(buildAboutImagePrompt(
+      input.category,
+      strategy.heroAngle,
+      visualSystem.paletteKey,
+    ), '1024x1024');
+
+    const featuredServiceImage = await generateHeroImage(buildFeaturedServiceImagePrompt(
+      featuredServiceTitle,
+      visualSystem.paletteKey,
+    ), '1024x1024');
+
+    const ctaBannerImage = await generateHeroImage(buildCtaBannerImagePrompt(
+      input.category,
+      study.business.locationContext,
+    ), '1792x1024');
 
     // Merge additional image URLs into content. These are post-Build additions —
     // they are not part of the Zod-validated SiteContent schema intentionally.
