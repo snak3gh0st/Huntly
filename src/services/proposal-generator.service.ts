@@ -500,7 +500,7 @@ export async function generateSiteContent(
   study?: LeadStudy,
   strategy?: Strategy,
 ): Promise<SiteContent> {
-  // Run all 3 sections in sequence (not parallel) to avoid rate-limit stacking.
+  // Run all 3 sections in parallel via Promise.all — faster and fine at typical proposal volumes.
   // If any section fails after its retry, the whole generation fails — no partial state.
   const [heroAndBrand, midSections, closingSections] = await Promise.all([
     generateHeroAndBrand(input, study, strategy),

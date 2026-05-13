@@ -103,7 +103,7 @@ export async function strategize(input: GeneratorInput, study: LeadStudy): Promi
     systemPrompt,
     userPrompt,
     json: true,
-    model: 'claude-opus-4-5',
+    model: 'claude-opus-4-7',
   });
 
   const parsed = parseAndValidateStrategy(raw);
@@ -114,7 +114,7 @@ export async function strategize(input: GeneratorInput, study: LeadStudy): Promi
     systemPrompt: `${systemPrompt}\n\nIMPORTANT: Your previous response failed validation: ${parsed.error}. Return ONLY valid JSON matching the schema exactly.`,
     userPrompt,
     json: true,
-    model: 'claude-opus-4-5',
+    model: 'claude-opus-4-7',
   });
 
   const retried = parseAndValidateStrategy(correctiveRaw);
