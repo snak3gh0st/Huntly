@@ -252,7 +252,247 @@ export function buildUserPrompt(input: GeneratorInput, study?: LeadStudy, strate
 }
 
 /* ------------------------------------------------------------------ */
-/*  Generator                                                          */
+/*  Per-section sub-schemas for 3-call split                          */
+/* ------------------------------------------------------------------ */
+
+/** Section 1: top-of-page brand + hero content */
+const HeroAndBrandSchema = z.object({
+  brand: z.object({
+    tagline:     z.string().min(1).max(160),
+    description: z.string().min(1).max(800),
+    manifesto:   z.string().min(1).max(280).optional(),
+  }),
+  hero: z.object({
+    imageQuery:        z.string().min(1).max(80),
+    ctaLabel:          z.string().min(1).max(40),
+    ctaAction:         z.enum(['call', 'email', 'scroll-to-form']),
+    secondaryCtaLabel: z.string().min(1).max(40).optional(),
+  }),
+  stats: z.object({
+    showRating:      z.boolean(),
+    showReviewCount: z.boolean(),
+    thirdMetric:     z.string().min(1).max(60).optional(),
+  }).nullable(),
+});
+type HeroAndBrand = z.infer<typeof HeroAndBrandSchema>;
+
+/** Section 2: middle-of-page services + social proof */
+const MidSectionsSchema = z.object({
+  services: z.array(z.object({
+    icon:        z.enum(ICON_NAMES),
+    title:       z.string().min(1).max(80),
+    description: z.string().min(1).max(320),
+  })).min(4).max(8),
+  testimonials: z.array(z.object({
+    quote:       z.string().min(1).max(400),
+    attribution: z.string().min(1).max(120),
+  })).max(4),
+  contact: z.object({
+    headline: z.string().min(1).max(60),
+    address:  z.string().nullable(),
+    phone:    z.string().nullable(),
+    whatsapp: z.string().nullable(),
+    hours:    z.string().nullable(),
+  }),
+});
+type MidSections = z.infer<typeof MidSectionsSchema>;
+
+/** Section 3: bottom-of-page sales chrome */
+const ClosingSectionsSchema = z.object({
+  diagnosis: z.object({
+    bullets: z.array(z.object({
+      icon:     z.enum(ICON_NAMES),
+      label:    z.string().min(1).max(120),
+      evidence: z.string().min(1).max(320),
+    })).min(2).max(5),
+  }),
+  pricingPitch: z.object({
+    headline:     z.string().min(1).max(160),
+    valueBullets: z.array(z.string().min(1).max(160)).min(2).max(4),
+  }),
+  cta: z.object({
+    primaryLabel: z.string().min(1).max(40),
+    reassurance:  z.string().min(1).max(120),
+  }),
+});
+type ClosingSections = z.infer<typeof ClosingSectionsSchema>;
+
+/* ------------------------------------------------------------------ */
+/*  Shared rules block (injected into every section prompt)            */
+/* ------------------------------------------------------------------ */
+
+function sharedRules(): string {
+  return `Global rules that apply to ALL sections:
+- LANGUAGE: English only.
+- COPY BANS: No "your trusted partner", "committed to excellence", "we go above and beyond", "passionate about", "dedicated to providing", "second to none", "your one-stop shop", "the difference is in the details". No "trusted by thousands", fabricated stats, or "since 19XX" unless year is in the data. No SaaS triplet copy (e.g. "simple. powerful. modern."). No em-dashes (—) or double hyphens (--). No "the future of [vertical]" framing.
+- SPECIFIC OVER GENERIC: every copy line must tie to a concrete signal from the lead's data. A line that could apply to any business in this category is wrong.
+- CHARACTER LIMITS ARE HARD CONSTRAINTS enforced by validation. Condense before returning — never exceed a field's limit.
+- NEVER make medical, legal, financial, or regulated-industry claims.
+- Return ONLY the JSON object. No markdown. No prose around the JSON. No comments.`;
+}
+
+function studyStrategySummary(study?: LeadStudy, strategy?: Strategy): string {
+  if (!study || !strategy) return '';
+  return `
+=== STUDY + STRATEGY (foundation for all copy) ===
+Business: ${study.business.actualServices.join(', ')}
+Target customers: ${study.business.targetCustomers}
+Unique angles: ${study.business.uniqueAngles.join('; ')}
+Location: ${study.business.locationContext}
+Customer language: ${study.voice.customerLanguage.join('; ')}
+Key pain points: ${study.voice.keyPainPoints.join('; ')}
+Key aspirations: ${study.voice.keyAspirations.join('; ')}
+Design assessment: ${study.currentSite.designAssessment}
+Current weaknesses: ${study.currentSite.weaknesses.join('; ')}
+Missing features: ${study.currentSite.missingFeatures.join('; ')}
+Hero angle: ${strategy.heroAngle}
+Copy tone: ${strategy.copyTone}
+Manifesto seed: ${strategy.manifestoSeed}
+Conversion opportunities: ${strategy.conversionOpportunities.map((c) => `[${c.gap}] → [${c.fix}]`).join('; ')}`;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Generic retry wrapper for per-section calls                       */
+/* ------------------------------------------------------------------ */
+
+function makeSectionParser<T>(
+  schema: z.ZodType<T>,
+): (raw: string) => { ok: true; value: T } | { ok: false; error: string } {
+  return (raw) => {
+    let json: unknown;
+    try { json = JSON.parse(raw); } catch (err) {
+      return { ok: false, error: `JSON parse failed: ${(err as Error).message}` };
+    }
+    const result = schema.safeParse(json);
+    if (result.success) return { ok: true, value: result.data };
+    return { ok: false, error: result.error.message };
+  };
+}
+
+async function callWithRetry<T>(
+  schema: z.ZodType<T>,
+  systemPrompt: string,
+  userPrompt: string,
+  sectionName: string,
+): Promise<T> {
+  const parse = makeSectionParser(schema);
+
+  const raw = await callAIWithProvider('anthropic', { systemPrompt, userPrompt, json: true });
+  const first = parse(raw);
+  if (first.ok) return first.value;
+
+  const correctiveRaw = await callAIWithProvider('anthropic', {
+    systemPrompt: `${systemPrompt}\n\nIMPORTANT: Your previous response failed validation: ${first.error}. Return ONLY valid JSON matching the schema exactly.`,
+    userPrompt,
+    json: true,
+  });
+  const second = parse(correctiveRaw);
+  if (second.ok) return second.value;
+
+  throw new Error(`${sectionName} generation failed validation twice: ${second.error}`);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Section 1 — Hero + Brand                                          */
+/* ------------------------------------------------------------------ */
+
+async function generateHeroAndBrand(
+  input: GeneratorInput,
+  study?: LeadStudy,
+  strategy?: Strategy,
+): Promise<HeroAndBrand> {
+  const systemPrompt = `You are writing the top-of-page content (brand identity + hero) for a small US business website.
+${studyStrategySummary(study, strategy)}
+
+Output STRICT JSON matching this schema:
+{
+  "brand": { "tagline": string<=160, "description": string<=800, "manifesto": string<=280 (optional) },
+  "hero": { "imageQuery": string<=80, "ctaLabel": string<=40, "ctaAction": "call"|"email"|"scroll-to-form", "secondaryCtaLabel": string<=40 (optional) },
+  "stats": { "showRating": boolean, "showReviewCount": boolean, "thirdMetric": string<=60 (optional) } | null
+}
+
+Section rules:
+- brand.tagline: punchy, specific to this business, not generic. Grounded in Strategy heroAngle.
+- brand.description: 2-3 sentences expanding the tagline. Mirror Strategy copyTone and Study voice.customerLanguage.
+- brand.manifesto: crystallize Strategy manifestoSeed into one powerful sentence. Optional but preferred.
+- hero.imageQuery: 2-5 word Unsplash search phrase, vertical+location specific. No people queries.
+- hero.ctaAction: "call" for high-intent phone verticals, "email" for B2B/consultants, "scroll-to-form" otherwise.
+- stats: null if Google rating < 4.0 OR review count < 25. Otherwise include showRating+showReviewCount=true.
+- PRICING MODEL: one-time investment, never "per month", "subscription", "monthly billing".
+
+${sharedRules()}`;
+
+  const userPrompt = buildUserPrompt(input, study, strategy);
+  return callWithRetry(HeroAndBrandSchema, systemPrompt, userPrompt, 'Section 1 (hero+brand)');
+}
+
+/* ------------------------------------------------------------------ */
+/*  Section 2 — Mid-page: Services + Testimonials + Contact           */
+/* ------------------------------------------------------------------ */
+
+async function generateMidSections(
+  input: GeneratorInput,
+  study?: LeadStudy,
+  strategy?: Strategy,
+): Promise<MidSections> {
+  const systemPrompt = `You are writing the middle sections (services, testimonials, contact) for a small US business website.
+${studyStrategySummary(study, strategy)}
+
+Output STRICT JSON matching this schema:
+{
+  "services": [ { "icon": IconName, "title": string<=80, "description": string<=320 } ],  // 4 to 8 items
+  "testimonials": [ { "quote": string<=400, "attribution": string<=120 } ],               // 0 to 4 items
+  "contact": { "headline": string<=60, "address": string|null, "phone": string|null, "whatsapp": string|null, "hours": string|null }
+}
+Where IconName is one of: phone, calendar, globe, message, clock, star, shield, zap, mail, mapPin.
+
+Section rules:
+- services: use Study business.actualServices as the source. These are the lead's REAL services. 4 minimum, 8 maximum.
+- services.description: what the service does for the customer, in customer language. No generic "We offer..." opener.
+- testimonials: ONLY quote snippets that appear in the Study voice.customerLanguage data. NEVER fabricate. Empty array if none.
+- contact: use null (not empty string) for unknown fields. Pull from input data (phone, address, hours).
+
+${sharedRules()}`;
+
+  const userPrompt = buildUserPrompt(input, study, strategy);
+  return callWithRetry(MidSectionsSchema, systemPrompt, userPrompt, 'Section 2 (mid-page)');
+}
+
+/* ------------------------------------------------------------------ */
+/*  Section 3 — Closing: Diagnosis + Pricing + CTA                   */
+/* ------------------------------------------------------------------ */
+
+async function generateClosingSections(
+  input: GeneratorInput,
+  study?: LeadStudy,
+  strategy?: Strategy,
+): Promise<ClosingSections> {
+  const systemPrompt = `You are writing the bottom-of-page sales sections (diagnosis, pricing pitch, CTA) for a small US business website proposal.
+${studyStrategySummary(study, strategy)}
+
+Output STRICT JSON matching this schema:
+{
+  "diagnosis": { "bullets": [ { "icon": IconName, "label": string<=120, "evidence": string<=320 } ] },  // 2 to 5 bullets
+  "pricingPitch": { "headline": string<=160, "valueBullets": [ string<=160 ] },                          // 2 to 4 bullets
+  "cta": { "primaryLabel": string<=40, "reassurance": string<=120 }
+}
+Where IconName is one of: phone, calendar, globe, message, clock, star, shield, zap, mail, mapPin.
+
+Section rules:
+- diagnosis.bullets: each bullet exposes a specific flaw in the lead's CURRENT online presence. Use Study weaknesses and Strategy conversionOpportunities.gap as the source. Each evidence field is the customer-observable consequence of that flaw. 2 minimum, 5 maximum.
+  - If Study says hasWebsite: false, focus bullets on absence of a site, not weaknesses.
+- pricingPitch.headline: frame as a one-time investment or year-one package. Never "per month", "subscription", "recurring".
+- pricingPitch.valueBullets: 2-4 short lines each <=160 chars. What the lead gets for their money.
+- cta: primaryLabel is the button text (action-oriented). reassurance is the quiet sub-line reducing friction.
+
+${sharedRules()}`;
+
+  const userPrompt = buildUserPrompt(input, study, strategy);
+  return callWithRetry(ClosingSectionsSchema, systemPrompt, userPrompt, 'Section 3 (closing)');
+}
+
+/* ------------------------------------------------------------------ */
+/*  Generator — 3-call split                                          */
 /* ------------------------------------------------------------------ */
 
 export async function generateSiteContent(
@@ -260,26 +500,33 @@ export async function generateSiteContent(
   study?: LeadStudy,
   strategy?: Strategy,
 ): Promise<SiteContent> {
-  const raw = await callAIWithProvider('anthropic', {
-    systemPrompt: buildSystemPrompt(study, strategy),
-    userPrompt: buildUserPrompt(input, study, strategy),
-    json: true,
-  });
+  // Run all 3 sections in sequence (not parallel) to avoid rate-limit stacking.
+  // If any section fails after its retry, the whole generation fails — no partial state.
+  const [heroAndBrand, midSections, closingSections] = await Promise.all([
+    generateHeroAndBrand(input, study, strategy),
+    generateMidSections(input, study, strategy),
+    generateClosingSections(input, study, strategy),
+  ]);
 
-  const parsed = parseAndValidate(raw);
-  if (parsed.ok) return parsed.value;
+  // Merge into the final SiteContent shape — validate the merged result
+  const merged: SiteContent = {
+    brand:        heroAndBrand.brand,
+    hero:         heroAndBrand.hero,
+    stats:        heroAndBrand.stats,
+    services:     midSections.services,
+    testimonials: midSections.testimonials,
+    contact:      midSections.contact,
+    diagnosis:    closingSections.diagnosis,
+    pricingPitch: closingSections.pricingPitch,
+    cta:          closingSections.cta,
+  };
 
-  // First validation failure — retry once with a corrective system message
-  const correctiveRaw = await callAIWithProvider('anthropic', {
-    systemPrompt: `${buildSystemPrompt(study, strategy)}\n\nIMPORTANT: Your previous response failed validation: ${parsed.error}. Return ONLY valid JSON matching the schema exactly.`,
-    userPrompt: buildUserPrompt(input, study, strategy),
-    json: true,
-  });
-
-  const retried = parseAndValidate(correctiveRaw);
-  if (retried.ok) return retried.value;
-
-  throw new Error(`Proposal generation failed validation twice: ${retried.error}`);
+  // Final full-schema validation as a safety net
+  const validation = SiteContentSchema.safeParse(merged);
+  if (!validation.success) {
+    throw new Error(`Merged SiteContent failed final validation: ${validation.error.message}`);
+  }
+  return validation.data;
 }
 
 function parseAndValidate(
@@ -295,3 +542,6 @@ function parseAndValidate(
   if (parsed.success) return { ok: true, value: parsed.data };
   return { ok: false, error: parsed.error.message };
 }
+
+// Re-exported for tests that call parseAndValidate indirectly via generateSiteContent
+export { parseAndValidate as _parseAndValidateForTesting };

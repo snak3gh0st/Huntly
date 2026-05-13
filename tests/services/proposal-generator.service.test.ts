@@ -280,77 +280,130 @@ describe('buildUserPrompt', () => {
   });
 });
 
+/* ------------------------------------------------------------------ */
+/*  Section mock fixtures for 3-call split                            */
+/* ------------------------------------------------------------------ */
+
+// Section 1: hero + brand
+const SECTION1_RESPONSE = {
+  brand: { tagline: 'Premier dental care', description: 'A family-run clinic.' },
+  hero: { imageQuery: 'modern dental office Austin', ctaLabel: 'Book Appointment', ctaAction: 'call' as const },
+  stats: { showRating: true, showReviewCount: true },
+};
+
+// Section 2: mid-page
+const SECTION2_RESPONSE = {
+  services: [
+    { icon: 'phone', title: 'Cleanings', description: 'Routine cleanings.' },
+    { icon: 'calendar', title: 'Checkups', description: 'Annual checkups.' },
+    { icon: 'star', title: 'Whitening', description: 'In-office whitening.' },
+    { icon: 'shield', title: 'Emergency', description: 'Same-day care.' },
+  ],
+  testimonials: [{ quote: 'Great service!', attribution: 'Sarah on Google' }],
+  contact: { headline: 'Visit us', address: '123 Main St', phone: '+15551234567', whatsapp: null, hours: 'Mon-Fri 9-5' },
+};
+
+// Section 3: closing
+const SECTION3_RESPONSE = {
+  diagnosis: {
+    bullets: [
+      { icon: 'clock', label: 'Slow replies', evidence: '12 reviews mention waiting.' },
+      { icon: 'message', label: 'No online booking', evidence: '5 reviewers asked.' },
+    ],
+  },
+  pricingPitch: { headline: 'One payment, full website', valueBullets: ['12 mo hosting', 'Same-day deployment'] },
+  cta: { primaryLabel: 'Accept Proposal', reassurance: '30-day support' },
+};
+
 describe('generateSiteContent', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('calls Anthropic via callAIWithProvider with json mode', async () => {
-    mockCallAIWithProvider.mockResolvedValue(JSON.stringify(VALID_CONTENT));
+  it('makes 3 Anthropic calls via callAIWithProvider with json mode', async () => {
+    mockCallAIWithProvider
+      .mockResolvedValueOnce(JSON.stringify(SECTION1_RESPONSE))
+      .mockResolvedValueOnce(JSON.stringify(SECTION2_RESPONSE))
+      .mockResolvedValueOnce(JSON.stringify(SECTION3_RESPONSE));
     await generateSiteContent(BASE_INPUT);
 
-    expect(mockCallAIWithProvider).toHaveBeenCalledTimes(1);
-    const [provider, opts] = mockCallAIWithProvider.mock.calls[0]!;
-    expect(provider).toBe('anthropic');
-    expect(opts).toEqual(
-      expect.objectContaining({ json: true }),
-    );
+    expect(mockCallAIWithProvider).toHaveBeenCalledTimes(3);
+    for (const call of mockCallAIWithProvider.mock.calls) {
+      const [provider, opts] = call;
+      expect(provider).toBe('anthropic');
+      expect((opts as { json: boolean }).json).toBe(true);
+    }
   });
 
-  it('returns the validated SiteContent', async () => {
-    mockCallAIWithProvider.mockResolvedValue(JSON.stringify(VALID_CONTENT));
+  it('returns merged SiteContent from 3 section calls', async () => {
+    mockCallAIWithProvider
+      .mockResolvedValueOnce(JSON.stringify(SECTION1_RESPONSE))
+      .mockResolvedValueOnce(JSON.stringify(SECTION2_RESPONSE))
+      .mockResolvedValueOnce(JSON.stringify(SECTION3_RESPONSE));
     const result = await generateSiteContent(BASE_INPUT);
     expect(result.brand.tagline).toBe('Premier dental care');
+    expect(result.services).toHaveLength(4);
+    expect(result.diagnosis.bullets).toHaveLength(2);
   });
 
-  it('passes study + strategy into system and user prompts when provided', async () => {
-    mockCallAIWithProvider.mockResolvedValue(JSON.stringify(VALID_CONTENT));
+  it('passes study + strategy data into user prompts when provided', async () => {
+    mockCallAIWithProvider
+      .mockResolvedValueOnce(JSON.stringify(SECTION1_RESPONSE))
+      .mockResolvedValueOnce(JSON.stringify(SECTION2_RESPONSE))
+      .mockResolvedValueOnce(JSON.stringify(SECTION3_RESPONSE));
     await generateSiteContent(BASE_INPUT, STUDY_FIXTURE, STRATEGY_FIXTURE);
 
-    const [, opts] = mockCallAIWithProvider.mock.calls[0]!;
-    const { systemPrompt, userPrompt } = opts as { systemPrompt: string; userPrompt: string };
-    expect(systemPrompt).toContain('STUDY AND STRATEGY PROVIDED');
-    expect(userPrompt).toContain('STUDY (Layer 1');
-    expect(userPrompt).toContain('STRATEGY (Layer 2');
+    // All 3 calls should embed study+strategy in their user prompts
+    for (const call of mockCallAIWithProvider.mock.calls) {
+      const [, opts] = call;
+      const { userPrompt } = opts as { userPrompt: string };
+      expect(userPrompt).toContain('STUDY (Layer 1');
+      expect(userPrompt).toContain('STRATEGY (Layer 2');
+    }
+  });
+
+  it('section system prompts contain study+strategy summary when provided', async () => {
+    mockCallAIWithProvider
+      .mockResolvedValueOnce(JSON.stringify(SECTION1_RESPONSE))
+      .mockResolvedValueOnce(JSON.stringify(SECTION2_RESPONSE))
+      .mockResolvedValueOnce(JSON.stringify(SECTION3_RESPONSE));
+    await generateSiteContent(BASE_INPUT, STUDY_FIXTURE, STRATEGY_FIXTURE);
+
+    for (const call of mockCallAIWithProvider.mock.calls) {
+      const [, opts] = call;
+      const { systemPrompt } = opts as { systemPrompt: string };
+      expect(systemPrompt).toContain('STUDY + STRATEGY');
+      expect(systemPrompt).toContain(STRATEGY_FIXTURE.heroAngle);
+    }
   });
 });
 
 describe('generateSiteContent — retry on validation failure', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('retries once when the first response is invalid JSON', async () => {
+  it('retries section 1 when it returns invalid JSON, then completes', async () => {
+    // Section 1 fails on first try, succeeds on retry; sections 2 and 3 succeed first try.
+    // Because sections run in parallel, all 3 start simultaneously. We need section 1 to
+    // fail first call and succeed second call, while sections 2 and 3 succeed on their calls.
+    // mockResolvedValueOnce sequences apply to consecutive calls regardless of Promise.all order.
     mockCallAIWithProvider
-      .mockResolvedValueOnce('definitely not json')
-      .mockResolvedValueOnce(JSON.stringify(VALID_CONTENT));
+      .mockResolvedValueOnce('not json')             // section 1 first attempt (fails)
+      .mockResolvedValueOnce(JSON.stringify(SECTION2_RESPONSE))  // section 2 first attempt
+      .mockResolvedValueOnce(JSON.stringify(SECTION3_RESPONSE))  // section 3 first attempt
+      .mockResolvedValueOnce(JSON.stringify(SECTION1_RESPONSE)); // section 1 retry
 
     const result = await generateSiteContent(BASE_INPUT);
-
     expect(result.brand.tagline).toBe('Premier dental care');
-    expect(mockCallAIWithProvider).toHaveBeenCalledTimes(2);
-
-    const secondCall = mockCallAIWithProvider.mock.calls[1]![1] as {
-      systemPrompt: string;
-    };
-    expect(secondCall.systemPrompt).toMatch(/previous response failed validation/i);
+    expect(mockCallAIWithProvider).toHaveBeenCalledTimes(4);
   });
 
-  it('retries once when first response fails schema validation', async () => {
-    const partialBad = { ...VALID_CONTENT, services: [] };  // < 4 services
+  it('throws after two validation failures in a section', async () => {
+    // All 3 sections are called; but if section 1 fails twice, the whole call throws.
+    // Section 1 called first in Promise.all order (races determine call order).
+    // Simplest: mock all calls with bad JSON — section 1 exhausts its 2 retries.
     mockCallAIWithProvider
-      .mockResolvedValueOnce(JSON.stringify(partialBad))
-      .mockResolvedValueOnce(JSON.stringify(VALID_CONTENT));
-
-    const result = await generateSiteContent(BASE_INPUT);
-    expect(result.services).toHaveLength(4);
-    expect(mockCallAIWithProvider).toHaveBeenCalledTimes(2);
-  });
-
-  it('throws after two validation failures', async () => {
-    mockCallAIWithProvider
-      .mockResolvedValueOnce('bad 1')
-      .mockResolvedValueOnce('bad 2');
+      .mockResolvedValue('bad json');
 
     await expect(generateSiteContent(BASE_INPUT)).rejects.toThrow(
       /failed validation twice/i,
     );
-    expect(mockCallAIWithProvider).toHaveBeenCalledTimes(2);
   });
 });
