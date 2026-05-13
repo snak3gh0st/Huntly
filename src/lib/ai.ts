@@ -140,10 +140,13 @@ async function callAnthropic(opts: AiCallOptions): Promise<string> {
 
   const model = opts.model ?? 'claude-sonnet-4-6';
 
+  // Opus 4.7+ deprecated the `temperature` parameter — only set it for older Sonnet/Haiku.
+  const supportsTemperature = !/opus-4-[7-9]|opus-[5-9]/.test(model);
+
   const res = await anthropicClient().messages.create({
     model,
     max_tokens: 4096,
-    temperature: 0.4,
+    ...(supportsTemperature ? { temperature: 0.4 } : {}),
     system: opts.systemPrompt,
     messages: [{ role: 'user', content: userPrompt }],
   });
@@ -193,10 +196,12 @@ export async function callAnthropicVision(opts: AnthropicVisionOptions): Promise
 
   contentBlocks.push({ type: 'text', text: userText });
 
+  const supportsTemperature = !/opus-4-[7-9]|opus-[5-9]/.test(model);
+
   const res = await anthropicClient().messages.create({
     model,
     max_tokens: 4096,
-    temperature: 0.4,
+    ...(supportsTemperature ? { temperature: 0.4 } : {}),
     system: opts.systemPrompt,
     messages: [{ role: 'user', content: contentBlocks }],
   });
