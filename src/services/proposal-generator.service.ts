@@ -56,10 +56,14 @@ export const SiteContentSchema = z.object({
     whatsapp: z.string().nullable(),
     hours:    z.string().nullable(),
   }),
+  // proposalIntro is intentionally optional — the visible template no longer
+  // renders it (the draft-preview banner replaced "Hi [team]..." framing).
+  // Kept in the schema for backward compat with stored proposals; Claude is
+  // instructed to omit it.
   proposalIntro: z.object({
     salutation: z.string().min(1).max(120),
     pitch:      z.string().min(1).max(1000),
-  }),
+  }).optional(),
   diagnosis: z.object({
     bullets: z.array(z.object({
       icon:     IconSchema,
@@ -147,7 +151,7 @@ Schema:
   "services": [ { "icon": IconName, "title": string<=80, "description": string<=320 } ]   // 4 to 8 items
   "testimonials": [ { "quote": string<=400, "attribution": string<=120 } ]                 // 0 to 4 items
   "contact": { "headline": string<=60, "address": string|null, "phone": string|null, "whatsapp": string|null, "hours": string|null },
-  "proposalIntro": { "salutation": string<=120, "pitch": string<=1000 },
+  "proposalIntro": OMIT THIS FIELD (legacy, no longer rendered — saves your output budget)
   "diagnosis": { "bullets": [ { "icon": IconName, "label": string<=120, "evidence": string<=320 } ] },  // 2 to 5
   "pricingPitch": { "headline": string<=160, "valueBullets": [ string<=160 ] },                          // 2 to 4 bullets
   "cta": { "primaryLabel": string<=40, "reassurance": string<=120 }
