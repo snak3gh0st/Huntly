@@ -6,7 +6,7 @@
   <title>{{business_name}}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,ital,wght@9..144,0,400;9..144,0,600;9..144,1,400;9..144,1,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="{{google_fonts_href}}" rel="stylesheet">
   <style>
     /* ── Smooth scroll (motion-gated) ───────────────────── */
     @media (prefers-reduced-motion: no-preference) {
@@ -24,7 +24,13 @@
       --accent:       oklch(0.62 0.16 35);
       --accent-quiet: oklch(0.92 0.04 35);
       --nav-h:        56px;
+      /* Font family variables — overridden by visual system per lead */
+      --font-display: 'Fraunces', serif;
+      --font-body:    'Inter', ui-sans-serif, system-ui, sans-serif;
     }
+
+    /* ── Per-lead visual system overrides (palette + fonts) ── */
+    {{visual_system_overrides}}
 
     /* ── Reset & base ─────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -32,7 +38,7 @@
     body {
       background: var(--bg);
       color: var(--ink);
-      font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      font-family: var(--font-body);
       font-size: 1.0625rem;
       line-height: 1.55;
       -webkit-font-smoothing: antialiased;
@@ -95,7 +101,7 @@
     }
 
     .site-nav-name {
-      font-family: 'Fraunces', serif;
+      font-family: var(--font-display);
       font-weight: 600;
       font-size: 1.0625rem;
       color: var(--ink);
@@ -154,7 +160,7 @@
       padding: 0.5625rem 1.25rem;
       background: var(--ink);
       color: var(--bg);
-      font-family: 'Fraunces', serif;
+      font-family: var(--font-display);
       font-weight: 600;
       font-size: 1rem;
       text-decoration: none;
@@ -201,7 +207,7 @@
     }
 
     .mobile-menu-links a {
-      font-family: 'Fraunces', serif;
+      font-family: var(--font-display);
       font-size: clamp(2rem, 8vw, 3.5rem);
       font-weight: 600;
       color: var(--ink);
@@ -217,7 +223,7 @@
       padding: 0.875rem 2rem;
       background: var(--ink);
       color: var(--bg);
-      font-family: 'Fraunces', serif;
+      font-family: var(--font-display);
       font-weight: 600;
       font-size: 1.125rem;
       text-decoration: none;
@@ -312,7 +318,7 @@
     }
 
     .hero-name {
-      font-family: 'Fraunces', serif;
+      font-family: var(--font-display);
       font-weight: 600;
       font-size: clamp(3.5rem, 9vw + 1rem, 9rem);
       line-height: 0.95;
@@ -340,7 +346,7 @@
       padding: 0.9375rem 1.875rem;
       background: var(--ink);
       color: var(--bg);
-      font-family: 'Fraunces', serif;
+      font-family: var(--font-display);
       font-weight: 600;
       font-size: 1.125rem;
       text-decoration: none;
@@ -395,7 +401,7 @@
     }
 
     .stats-numeral {
-      font-family: 'Fraunces', serif;
+      font-family: var(--font-display);
       font-weight: 600;
       font-size: clamp(2.5rem, 5vw + 1rem, 4rem);
       line-height: 1;
@@ -456,7 +462,7 @@
     }
 
     .why-us-num {
-      font-family: 'Fraunces', serif;
+      font-family: var(--font-display);
       font-weight: 600;
       font-size: clamp(2.5rem, 5vw, 4rem);
       line-height: 0.9;
@@ -491,7 +497,7 @@
 
     .section-heading {
       margin-top: 0.5rem;
-      font-family: 'Fraunces', serif;
+      font-family: var(--font-display);
       font-weight: 600;
       font-size: clamp(1.5rem, 1.5vw + 1rem, 2rem);
       line-height: 1.15;
@@ -525,7 +531,7 @@
     .service-featured .service-icon-wrap svg { width: 20px; height: 20px; }
 
     .service-featured-title {
-      font-family: 'Fraunces', serif;
+      font-family: var(--font-display);
       font-weight: 600;
       font-size: clamp(1.375rem, 2vw + 0.5rem, 1.75rem);
       line-height: 1.2;
@@ -545,7 +551,7 @@
     }
 
     .service-row-num {
-      font-family: 'Fraunces', serif;
+      font-family: var(--font-display);
       font-weight: 600;
       font-size: clamp(2rem, 4vw, 3rem);
       line-height: 0.9;
@@ -558,7 +564,7 @@
     .service-row-body { flex: 1; }
 
     .service-row-title {
-      font-family: 'Inter', sans-serif;
+      font-family: var(--font-body);
       font-weight: 600;
       font-size: 1.0625rem;
       color: var(--ink);
@@ -670,7 +676,7 @@
 
     .testimonial-quote {
       position: relative;
-      font-family: 'Fraunces', serif;
+      font-family: var(--font-display);
       font-weight: 600;
       font-style: italic;
       font-size: clamp(1.5rem, 2vw + 1rem, 2.25rem);
@@ -684,7 +690,7 @@
       left: -0.25rem;
       font-size: 3.5rem;
       color: var(--accent);
-      font-family: 'Fraunces', serif;
+      font-family: var(--font-display);
       font-weight: 600;
       font-style: normal;
       line-height: 1;
@@ -789,7 +795,7 @@
     }
 
     .footer-name {
-      font-family: 'Fraunces', serif;
+      font-family: var(--font-display);
       font-weight: 600;
       font-size: 1rem;
       color: var(--ink);

@@ -19,6 +19,11 @@ import { fileURLToPath } from 'node:url';
 import { escapeHtml } from '../lib/escape-html.js';
 import { priceForTier, type Tier } from '../lib/pricing-tiers.js';
 import { fetchUnsplash, VERTICAL_FALLBACK_QUERY, type UnsplashPhoto } from '../lib/unsplash.js';
+import {
+  buildVisualSystemCss,
+  buildGoogleFontsHref,
+  type VisualSystem,
+} from './visual-system.service.js';
 import type { SiteContent, IconName } from './proposal-generator.service.js';
 import type { LeadStudy } from './lead-study.service.js';
 import type { Strategy } from './lead-strategy.service.js';
@@ -26,12 +31,13 @@ import type { Strategy } from './lead-strategy.service.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /* ------------------------------------------------------------------ */
-/*  Extended content type: SiteContent + optional study/strategy       */
+/*  Extended content type: SiteContent + optional study/strategy/vs   */
 /* ------------------------------------------------------------------ */
 
 type RichContent = SiteContent & {
   _study?: LeadStudy;
   _strategy?: Strategy;
+  _visualSystem?: VisualSystem;
 };
 
 /* ------------------------------------------------------------------ */
@@ -497,7 +503,7 @@ export async function renderProposalView(args: {
     priceCents: number | null;
     paymentLinkUrl: string | null;
   };
-  content: SiteContent & { _study?: LeadStudy; _strategy?: Strategy };
+  content: SiteContent & { _study?: LeadStudy; _strategy?: Strategy; _visualSystem?: VisualSystem };
 }): Promise<string> {
   const content: RichContent = args.content;
 
@@ -516,23 +522,30 @@ export async function renderProposalView(args: {
   const hasWhyUsProposal = (content._study?.business.uniqueAngles?.length ?? 0) >= 2;
   const whyNavLink = hasWhyUsProposal ? '<li><a href="#why">Why us</a></li>' : '';
 
+  // Build visual system CSS overrides (falls back to warmNeutral/fraunces_inter if absent)
+  const vs = content._visualSystem ?? { paletteKey: 'warmNeutral' as const, fontKey: 'fraunces_inter' as const, reasoning: 'default' };
+  const visualSystemOverrides = buildVisualSystemCss(vs);
+  const googleFontsHref = buildGoogleFontsHref(vs.fontKey);
+
   // Order: site mockup (hero → stats → why-us → services → what-changes →
   // testimonials → contact) reads first as the lead's actual new website.
   // Then the sales section with diagnosis + pricing + form.
   return substitute(loadTemplate('proposal-shell.html'), {
-    business_name:  escapeHtml(args.lead.businessName),
-    cta_href:       escapeHtml(ctaHref),
-    cta_label:      escapeHtml(args.content.hero.ctaLabel),
-    brand_hero:     renderBrandHero(content, args.lead, photo, ctaHref),
-    stats:          renderStats(content, args.lead),
-    why_nav_link:   whyNavLink,
-    why_us:         renderWhyUs(content, args.lead),
-    services:       renderServices(content),
-    what_changes:   renderWhatChanges(content),
-    testimonials:   renderTestimonials(content, args.lead),
-    contact:        renderContact(content, args.lead),
-    sales_section:  renderSalesSection(content, args.lead, args.proposal),
-    site_footer:    renderFooter(content, args.lead, photo),
+    business_name:            escapeHtml(args.lead.businessName),
+    cta_href:                 escapeHtml(ctaHref),
+    cta_label:                escapeHtml(args.content.hero.ctaLabel),
+    brand_hero:               renderBrandHero(content, args.lead, photo, ctaHref),
+    stats:                    renderStats(content, args.lead),
+    why_nav_link:             whyNavLink,
+    why_us:                   renderWhyUs(content, args.lead),
+    services:                 renderServices(content),
+    what_changes:             renderWhatChanges(content),
+    testimonials:             renderTestimonials(content, args.lead),
+    contact:                  renderContact(content, args.lead),
+    sales_section:            renderSalesSection(content, args.lead, args.proposal),
+    site_footer:              renderFooter(content, args.lead, photo),
+    visual_system_overrides:  visualSystemOverrides,
+    google_fonts_href:        googleFontsHref,
   });
 }
 
@@ -545,7 +558,7 @@ export async function renderLiveSite(args: {
     googleReviewCount?: number | null;
     category?: string | null;
   };
-  content: SiteContent & { _study?: LeadStudy; _strategy?: Strategy };
+  content: SiteContent & { _study?: LeadStudy; _strategy?: Strategy; _visualSystem?: VisualSystem };
 }): Promise<string> {
   const content: RichContent = args.content;
 
@@ -563,18 +576,25 @@ export async function renderLiveSite(args: {
   const hasWhyUsSite = (content._study?.business.uniqueAngles?.length ?? 0) >= 2;
   const whyNavLinkSite = hasWhyUsSite ? '<li><a href="#why">Why us</a></li>' : '';
 
+  // Build visual system CSS overrides (falls back to warmNeutral/fraunces_inter if absent)
+  const vs = content._visualSystem ?? { paletteKey: 'warmNeutral' as const, fontKey: 'fraunces_inter' as const, reasoning: 'default' };
+  const visualSystemOverrides = buildVisualSystemCss(vs);
+  const googleFontsHref = buildGoogleFontsHref(vs.fontKey);
+
   return substitute(loadTemplate('site-shell.html'), {
-    business_name: escapeHtml(args.lead.businessName),
-    cta_href:      escapeHtml(ctaHref),
-    cta_label:     escapeHtml(args.content.hero.ctaLabel),
-    brand_hero:    renderBrandHero(content, args.lead, photo, ctaHref),
-    stats:         renderStats(content, args.lead),
-    why_nav_link:  whyNavLinkSite,
-    why_us:        renderWhyUs(content, args.lead),
-    services:      renderServices(content),
-    what_changes:  renderWhatChanges(content),
-    testimonials:  renderTestimonials(content, args.lead),
-    contact:       renderContact(content, args.lead),
-    site_footer:   renderFooter(content, args.lead, photo),
+    business_name:           escapeHtml(args.lead.businessName),
+    cta_href:                escapeHtml(ctaHref),
+    cta_label:               escapeHtml(args.content.hero.ctaLabel),
+    brand_hero:              renderBrandHero(content, args.lead, photo, ctaHref),
+    stats:                   renderStats(content, args.lead),
+    why_nav_link:            whyNavLinkSite,
+    why_us:                  renderWhyUs(content, args.lead),
+    services:                renderServices(content),
+    what_changes:            renderWhatChanges(content),
+    testimonials:            renderTestimonials(content, args.lead),
+    contact:                 renderContact(content, args.lead),
+    site_footer:             renderFooter(content, args.lead, photo),
+    visual_system_overrides: visualSystemOverrides,
+    google_fonts_href:       googleFontsHref,
   });
 }
