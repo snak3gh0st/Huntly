@@ -96,10 +96,14 @@ export async function strategize(input: GeneratorInput, study: LeadStudy): Promi
   const systemPrompt = buildStrategySystemPrompt();
   const userPrompt = buildStrategyUserPrompt(input, study);
 
+  // Layer 2 runs on Claude Opus for deeper reasoning on hero angle and conversion strategy.
+  // Cost trade-off: ~$0.18–0.25 per proposal vs ~$0.04 for Sonnet, but strategy quality
+  // is the single highest-leverage call — a weak hero angle kills the whole proposal.
   const raw = await callAIWithProvider('anthropic', {
     systemPrompt,
     userPrompt,
     json: true,
+    model: 'claude-opus-4-5',
   });
 
   const parsed = parseAndValidateStrategy(raw);
@@ -110,6 +114,7 @@ export async function strategize(input: GeneratorInput, study: LeadStudy): Promi
     systemPrompt: `${systemPrompt}\n\nIMPORTANT: Your previous response failed validation: ${parsed.error}. Return ONLY valid JSON matching the schema exactly.`,
     userPrompt,
     json: true,
+    model: 'claude-opus-4-5',
   });
 
   const retried = parseAndValidateStrategy(correctiveRaw);
