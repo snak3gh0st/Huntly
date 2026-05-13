@@ -207,12 +207,40 @@ function buildStudyUserPrompt(input: GeneratorInput, crawledContent: string | nu
 /*  Parse + validate helper                                            */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Extract the first balanced JSON object from a string, ignoring any prose,
+ * markdown fences, or trailing content Claude may have appended. Walks
+ * char-by-char tracking brace depth, skipping over string literals (so a `}`
+ * inside a string doesn't decrement depth).
+ */
+function extractFirstJsonObject(raw: string): string | null {
+  const start = raw.indexOf('{');
+  if (start === -1) return null;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < raw.length; i++) {
+    const c = raw[i];
+    if (escape) { escape = false; continue; }
+    if (c === '\\') { escape = true; continue; }
+    if (c === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (c === '{') depth++;
+    else if (c === '}') {
+      depth--;
+      if (depth === 0) return raw.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
 function parseAndValidateStudy(
   raw: string,
 ): { ok: true; value: LeadStudy } | { ok: false; error: string } {
   let json: unknown;
   try {
-    json = JSON.parse(raw);
+    const extracted = extractFirstJsonObject(raw) ?? raw;
+    json = JSON.parse(extracted);
   } catch (err) {
     return { ok: false, error: `JSON parse failed: ${(err as Error).message}` };
   }
