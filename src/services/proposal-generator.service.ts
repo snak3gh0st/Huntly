@@ -32,13 +32,15 @@ export const SiteContentSchema = z.object({
     manifesto:   z.string().min(1).max(220).optional(),
   }),
   hero: z.object({
-    imageQuery: z.string().min(1).max(80),
-    ctaLabel:   z.string().min(1).max(40),
-    ctaAction:  z.enum(['call', 'email', 'scroll-to-form']),
+    imageQuery:          z.string().min(1).max(80),
+    ctaLabel:            z.string().min(1).max(40),
+    ctaAction:           z.enum(['call', 'email', 'scroll-to-form']),
+    secondaryCtaLabel:   z.string().min(1).max(40).optional(),
   }),
   stats: z.object({
     showRating:      z.boolean(),
     showReviewCount: z.boolean(),
+    thirdMetric:     z.string().min(1).max(60).optional(),
   }).nullable(),
   services: z.array(z.object({
     icon:        IconSchema,
@@ -146,8 +148,8 @@ Output STRICT JSON ONLY, matching this exact schema. No markdown. No prose aroun
 Schema:
 {
   "brand": { "tagline": string<=120, "description": string<=500, "manifesto": string<=220 },
-  "hero": { "imageQuery": string<=80, "ctaLabel": string<=40, "ctaAction": "call"|"email"|"scroll-to-form" },
-  "stats": { "showRating": boolean, "showReviewCount": boolean } | null,
+  "hero": { "imageQuery": string<=80, "ctaLabel": string<=40, "ctaAction": "call"|"email"|"scroll-to-form", "secondaryCtaLabel": string<=40 (optional, default "See why") },
+  "stats": { "showRating": boolean, "showReviewCount": boolean, "thirdMetric": string<=60 (optional, e.g. "12 years in Austin" or "Bilingual service") } | null,
   "services": [ { "icon": IconName, "title": string<=80, "description": string<=320 } ]   // 4 to 8 items
   "testimonials": [ { "quote": string<=400, "attribution": string<=120 } ]                 // 0 to 4 items
   "contact": { "headline": string<=60, "address": string|null, "phone": string|null, "whatsapp": string|null, "hours": string|null },

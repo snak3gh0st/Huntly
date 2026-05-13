@@ -2,7 +2,8 @@
  * Authoritative visual spec lives in DESIGN.md at the repo root.
  *   - OKLCH color tokens
  *   - Fraunces + Inter type scale
- *   - Section rhythm (hero → stats → services → testimonials → contact → sales)
+ *   - Section rhythm (hero → stats → why-us → services → what-changes →
+ *     testimonials → contact → sales)
  *   - Component specs (diagnosis bullets, service cards, pull quotes, contact grid, etc.)
  *
  * Before editing this file or any template under src/templates/proposal/:
@@ -19,8 +20,19 @@ import { escapeHtml } from '../lib/escape-html.js';
 import { priceForTier, type Tier } from '../lib/pricing-tiers.js';
 import { fetchUnsplash, VERTICAL_FALLBACK_QUERY, type UnsplashPhoto } from '../lib/unsplash.js';
 import type { SiteContent, IconName } from './proposal-generator.service.js';
+import type { LeadStudy } from './lead-study.service.js';
+import type { Strategy } from './lead-strategy.service.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+/* ------------------------------------------------------------------ */
+/*  Extended content type: SiteContent + optional study/strategy       */
+/* ------------------------------------------------------------------ */
+
+type RichContent = SiteContent & {
+  _study?: LeadStudy;
+  _strategy?: Strategy;
+};
 
 /* ------------------------------------------------------------------ */
 /*  Template loading + caching                                         */
@@ -92,8 +104,8 @@ function resolveCtaHref(
 /* ------------------------------------------------------------------ */
 
 function renderBrandHero(
-  content: SiteContent,
-  lead: { businessName: string },
+  content: RichContent,
+  lead: { businessName: string; category?: string | null },
   photo: UnsplashPhoto | null,
   ctaHref: string,
 ): string {
@@ -113,21 +125,48 @@ function renderBrandHero(
     bgAttrs += ` style="background-image: url('${escapeHtml(photo.url)}')"`;
   }
 
+  // Derive eyebrow from locationContext or category + businessName
+  const locationCtx = content._study?.business.locationContext;
+  const rawCategory = lead.category ?? '';
+  // Map category slug to display string: "dental_clinic" → "Dental"
+  const categoryDisplay = rawCategory
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim();
+  let eyebrow = '';
+  if (locationCtx) {
+    // Extract just the city from locationContext (first sentence)
+    const city = locationCtx.split(/[.,]/)[0].trim();
+    eyebrow = categoryDisplay ? `${categoryDisplay} &middot; ${escapeHtml(city)}` : escapeHtml(city);
+  } else if (categoryDisplay) {
+    eyebrow = escapeHtml(categoryDisplay);
+  } else {
+    eyebrow = escapeHtml(lead.businessName);
+  }
+
+  // Secondary CTA only renders when Why Us section will actually appear
+  const hasWhyUs = (content._study?.business.uniqueAngles?.length ?? 0) >= 2;
+  const secondaryCta = hasWhyUs
+    ? `<a href="#why" class="hero-secondary-cta">${escapeHtml(content.hero.secondaryCtaLabel ?? 'See why')} &#8594;</a>`
+    : '';
+
   const template = loadTemplate('sections/brand-hero.html');
   return substitute(template, {
-    business_name:    escapeHtml(lead.businessName),
-    tagline:          escapeHtml(content.brand.tagline),
-    description:      escapeHtml(content.brand.description),
-    cta_href:         escapeHtml(ctaHref),
-    cta_label:        escapeHtml(content.hero.ctaLabel),
-    hero_bg_attrs:    bgAttrs,
-    hero_img_alt:     heroImgAlt,
+    business_name:   escapeHtml(lead.businessName),
+    tagline:         escapeHtml(content.brand.tagline),
+    description:     escapeHtml(content.brand.description),
+    cta_href:        escapeHtml(ctaHref),
+    cta_label:       escapeHtml(content.hero.ctaLabel),
+    secondary_cta:   secondaryCta,
+    hero_bg_attrs:   bgAttrs,
+    hero_img_alt:    heroImgAlt,
     hero_attribution: attribution,
+    hero_eyebrow:    eyebrow,
   });
 }
 
 function renderStats(
-  content: SiteContent,
+  content: RichContent,
   lead: {
     googleRating?: number | null;
     googleReviewCount?: number | null;
@@ -140,36 +179,120 @@ function renderStats(
 
   if (!rating && !reviewCount) return '';
 
-  const parts: string[] = [];
-  if (content.stats.showRating && rating) {
-    parts.push(`${rating.toFixed(1)} stars`);
-  }
-  if (content.stats.showReviewCount && reviewCount) {
-    parts.push(`${reviewCount.toLocaleString('en-US')} reviews on Google`);
-  }
+  const ratingCol = (content.stats.showRating && rating)
+    ? `<div class="stats-col">
+        <span class="stats-numeral">${rating.toFixed(1)}</span>
+        <span class="stats-caption">&#9733; Rating</span>
+      </div>`
+    : '';
 
-  if (parts.length === 0) return '';
+  const reviewCol = (content.stats.showReviewCount && reviewCount)
+    ? `<div class="stats-col">
+        <span class="stats-numeral">${reviewCount.toLocaleString('en-US')}</span>
+        <span class="stats-caption">Reviews on Google</span>
+      </div>`
+    : '';
 
-  const ratingText = parts.join(' &middot; ');
-  return substitute(loadTemplate('sections/stats-strip.html'), {
-    rating_text: ratingText,
+  const thirdCol = content.stats.thirdMetric
+    ? `<div class="stats-col">
+        <span class="stats-numeral stats-numeral--text">${escapeHtml(content.stats.thirdMetric)}</span>
+        <span class="stats-caption">Local presence</span>
+      </div>`
+    : '';
+
+  // Only render the strip if we have at least one column
+  if (!ratingCol && !reviewCol && !thirdCol) return '';
+
+  return `<section class="stats-strip" aria-label="Rating and reviews">
+  <div class="stats-inner">
+    ${ratingCol}${reviewCol}${thirdCol}
+  </div>
+</section>`;
+}
+
+function renderWhyUs(
+  content: RichContent,
+  lead: { businessName: string },
+): string {
+  const uniqueAngles = content._study?.business.uniqueAngles ?? [];
+  if (uniqueAngles.length < 2) return '';
+
+  const items = uniqueAngles
+    .map((angle, i) => {
+      const num = String(i + 1).padStart(2, '0');
+      const mod = i % 2 === 1 ? ' why-us-item--offset' : '';
+      return `<div class="why-us-item${mod}">
+  <span class="why-us-num" aria-hidden="true">${num}</span>
+  <p class="why-us-text">${escapeHtml(angle)}</p>
+</div>`;
+    })
+    .join('\n');
+
+  return substitute(loadTemplate('sections/why-us.html'), {
+    business_name: escapeHtml(lead.businessName),
+    items,
   });
 }
 
-function renderServices(content: SiteContent): string {
-  const items = content.services
-    .map((s) => `
-<div class="service-card">
-  <div class="service-icon-wrap" aria-hidden="true">${ICON_SVG[s.icon]}</div>
-  <h3 class="service-title">${escapeHtml(s.title)}</h3>
-  <p class="service-desc">${escapeHtml(s.description)}</p>
+function renderServices(content: RichContent): string {
+  const services = content.services;
+  if (services.length === 0) return '';
+
+  const featured = services[0];
+  const featuredHtml = `<div class="service-featured">
+  <div class="service-icon-wrap" aria-hidden="true">${ICON_SVG[featured.icon]}</div>
+  <h3 class="service-featured-title">${escapeHtml(featured.title)}</h3>
+  <details class="service-details">
+    <summary class="service-summary">About this service</summary>
+    <p class="service-details-body">${escapeHtml(featured.description)}</p>
+  </details>
+</div>`;
+
+  const supporting = services.slice(1)
+    .map((s, i) => {
+      const num = String(i + 2).padStart(2, '0');
+      return `<div class="service-row">
+  <span class="service-row-num" aria-hidden="true">${num}</span>
+  <div class="service-row-body">
+    <p class="service-row-title">${escapeHtml(s.title)}</p>
+    <details class="service-details">
+      <summary class="service-summary">About this service</summary>
+      <p class="service-details-body">${escapeHtml(s.description)}</p>
+    </details>
+  </div>
+</div>`;
+    })
+    .join('\n');
+
+  return substitute(loadTemplate('sections/services.html'), {
+    featured_item:    featuredHtml,
+    supporting_items: supporting,
+  });
+}
+
+function renderWhatChanges(content: RichContent): string {
+  const opps = content._strategy?.conversionOpportunities ?? [];
+  if (opps.length < 2) return '';
+
+  const rows = opps
+    .map((opp) => `<div class="change-row">
+  <div class="change-gap">
+    <span class="change-gap-label" aria-hidden="true">Today</span>
+    <p class="change-gap-text">${escapeHtml(opp.gap)}</p>
+  </div>
+  <div class="change-arrow" aria-hidden="true">&#8594;</div>
+  <div class="change-fix">
+    <span class="change-fix-label" aria-hidden="true">New site</span>
+    <p class="change-fix-text">${escapeHtml(opp.fix)}</p>
+  </div>
 </div>`)
     .join('\n');
-  return substitute(loadTemplate('sections/services.html'), { items });
+
+  return substitute(loadTemplate('sections/what-changes.html'), { rows });
 }
 
 function renderTestimonials(
-  content: SiteContent,
+  content: RichContent,
   lead: { businessName: string },
 ): string {
   if (content.testimonials.length === 0) return '';
@@ -178,9 +301,12 @@ function renderTestimonials(
     .map((t) => `
 <article class="testimonial-item">
   <div class="testimonial-stars" aria-label="5 stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
-  <blockquote class="testimonial-quote">&ldquo;${escapeHtml(t.quote)}&rdquo;</blockquote>
+  <blockquote class="testimonial-quote">
+    <span class="testimonial-curly-quote" aria-hidden="true">&ldquo;</span>
+    <span class="testimonial-quote-text">${escapeHtml(t.quote)}&rdquo;</span>
+  </blockquote>
   <footer>
-    <p class="testimonial-attribution">&#8212;&nbsp;${escapeHtml(t.attribution)}</p>
+    <p class="testimonial-attribution">${escapeHtml(t.attribution)}</p>
     <a href="${escapeHtml(googleMapsUrl)}" target="_blank" rel="noopener noreferrer" class="testimonial-google-link">Read more on Google &#8594;</a>
   </footer>
 </article>`)
@@ -189,7 +315,7 @@ function renderTestimonials(
 }
 
 function renderContact(
-  content: SiteContent,
+  content: RichContent,
   lead: { businessName: string },
 ): string {
   const pairs: Array<[string, string]> = [];
@@ -218,16 +344,19 @@ function renderContact(
   });
 }
 
-function renderDiagnosis(content: SiteContent): string {
+function renderDiagnosis(content: RichContent): string {
   const bullets = content.diagnosis.bullets
-    .map((b) => `
+    .map((b, i) => {
+      const num = String(i + 1).padStart(2, '0');
+      return `
 <li class="diagnosis-item">
-  <span class="diagnosis-icon">${ICON_SVG[b.icon]}</span>
+  <span class="diagnosis-num" aria-hidden="true">${num}</span>
   <div>
     <p class="diagnosis-label">${escapeHtml(b.label)}</p>
     <p class="diagnosis-evidence">${escapeHtml(b.evidence)}</p>
   </div>
-</li>`)
+</li>`;
+    })
     .join('\n');
   return substitute(loadTemplate('sections/diagnosis.html'), { bullets });
 }
@@ -244,7 +373,7 @@ function formatUsd(cents: number): string {
 }
 
 function renderPricing(
-  content: SiteContent,
+  content: RichContent,
   proposal: { finalTier: Tier | null; priceCents: number | null },
 ): string {
   const tier = proposal.finalTier ?? 'Starter';
@@ -263,7 +392,7 @@ function renderPricing(
 }
 
 function renderCtaForm(
-  content: SiteContent,
+  content: RichContent,
   proposal: { token: string; paymentLinkUrl: string | null; finalTier: Tier | null; priceCents: number | null },
 ): string {
   const tier = proposal.finalTier ?? 'Starter';
@@ -281,7 +410,7 @@ function renderCtaForm(
 }
 
 function renderSalesSection(
-  content: SiteContent,
+  content: RichContent,
   lead: { businessName: string },
   proposal: { token: string; finalTier: Tier | null; priceCents: number | null; paymentLinkUrl: string | null },
 ): string {
@@ -292,17 +421,61 @@ function renderSalesSection(
   return `
 <section class="sales-section" id="accept-form">
   <div class="sales-inner">
-    <p class="sales-caption">Draft preview</p>
+    <p class="sales-caption"><span class="sales-caption-mark" aria-hidden="true">&#9670;</span> Draft preview</p>
     <h2 class="sales-heading">Want to publish this site for ${escapeHtml(lead.businessName)}?</h2>
     ${diagnosis}
-    ${pricing}
+    <div class="sales-pricing-card">
+      ${pricing}
+    </div>
     ${ctaForm}
   </div>
 </section>`;
 }
 
-function renderFooter(): string {
-  return loadTemplate('sections/site-footer.html');
+function renderFooter(
+  content: RichContent,
+  lead: { businessName: string },
+  photo: UnsplashPhoto | null,
+): string {
+  const servicesLinks = content.services
+    .map((s) => `<li><a href="#services">${escapeHtml(s.title)}</a></li>`)
+    .join('\n');
+
+  const contactSummary: string[] = [];
+  if (content.contact.address) contactSummary.push(escapeHtml(content.contact.address));
+  if (content.contact.phone)   contactSummary.push(escapeHtml(content.contact.phone));
+
+  const attribution = photo
+    ? `<li>Photos via <a href="${escapeHtml(photo.attributionUrl)}" target="_blank" rel="noopener">Unsplash</a></li>`
+    : '';
+
+  const tagline = content.brand.tagline ? `<p class="footer-tagline">${escapeHtml(content.brand.tagline)}</p>` : '';
+
+  return `<footer class="page-footer">
+  <div class="footer-inner">
+    <div class="footer-col footer-col--brand">
+      <p class="footer-name">${escapeHtml(lead.businessName)}</p>
+      ${tagline}
+    </div>
+    <div class="footer-col">
+      <p class="footer-col-label">Services</p>
+      <ul class="footer-list">${servicesLinks}</ul>
+    </div>
+    <div class="footer-col">
+      <p class="footer-col-label">Contact</p>
+      <ul class="footer-list">
+        ${contactSummary.map((c) => `<li>${c}</li>`).join('\n')}
+        ${attribution}
+      </ul>
+    </div>
+    <div class="footer-col">
+      <p class="footer-col-label">Built by</p>
+      <ul class="footer-list">
+        <li><a href="https://huntly.app" target="_blank" rel="noopener">Huntly Sites</a></li>
+      </ul>
+    </div>
+  </div>
+</footer>`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -324,8 +497,10 @@ export async function renderProposalView(args: {
     priceCents: number | null;
     paymentLinkUrl: string | null;
   };
-  content: SiteContent;
+  content: SiteContent & { _study?: LeadStudy; _strategy?: Strategy };
 }): Promise<string> {
+  const content: RichContent = args.content;
+
   const ctaHref = resolveCtaHref(args.content.hero.ctaAction, {
     phone: args.lead.phone,
     email: args.lead.email,
@@ -337,21 +512,27 @@ export async function renderProposalView(args: {
     args.lead.category ?? undefined,
   );
 
-  // Order: site mockup (hero → contact) reads first as the lead's actual
-  // new website. Then the sales section with diagnosis + pricing + form.
-  // The `proposalIntro` field exists in the schema (AI fills it) but is
-  // intentionally not rendered — the draft-banner handles that framing.
+  // Whether Why Us section will render — drives nav link and secondary CTA
+  const hasWhyUsProposal = (content._study?.business.uniqueAngles?.length ?? 0) >= 2;
+  const whyNavLink = hasWhyUsProposal ? '<li><a href="#why">Why us</a></li>' : '';
+
+  // Order: site mockup (hero → stats → why-us → services → what-changes →
+  // testimonials → contact) reads first as the lead's actual new website.
+  // Then the sales section with diagnosis + pricing + form.
   return substitute(loadTemplate('proposal-shell.html'), {
     business_name:  escapeHtml(args.lead.businessName),
     cta_href:       escapeHtml(ctaHref),
     cta_label:      escapeHtml(args.content.hero.ctaLabel),
-    brand_hero:     renderBrandHero(args.content, args.lead, photo, ctaHref),
-    stats:          renderStats(args.content, args.lead),
-    services:       renderServices(args.content),
-    testimonials:   renderTestimonials(args.content, args.lead),
-    contact:        renderContact(args.content, args.lead),
-    sales_section:  renderSalesSection(args.content, args.lead, args.proposal),
-    site_footer:    renderFooter(),
+    brand_hero:     renderBrandHero(content, args.lead, photo, ctaHref),
+    stats:          renderStats(content, args.lead),
+    why_nav_link:   whyNavLink,
+    why_us:         renderWhyUs(content, args.lead),
+    services:       renderServices(content),
+    what_changes:   renderWhatChanges(content),
+    testimonials:   renderTestimonials(content, args.lead),
+    contact:        renderContact(content, args.lead),
+    sales_section:  renderSalesSection(content, args.lead, args.proposal),
+    site_footer:    renderFooter(content, args.lead, photo),
   });
 }
 
@@ -364,8 +545,10 @@ export async function renderLiveSite(args: {
     googleReviewCount?: number | null;
     category?: string | null;
   };
-  content: SiteContent;
+  content: SiteContent & { _study?: LeadStudy; _strategy?: Strategy };
 }): Promise<string> {
+  const content: RichContent = args.content;
+
   const ctaHref = resolveCtaHref(args.content.hero.ctaAction, {
     phone: args.lead.phone,
     email: args.lead.email,
@@ -376,15 +559,22 @@ export async function renderLiveSite(args: {
     args.lead.category ?? undefined,
   );
 
+  // Whether Why Us section will render — drives nav link and secondary CTA
+  const hasWhyUsSite = (content._study?.business.uniqueAngles?.length ?? 0) >= 2;
+  const whyNavLinkSite = hasWhyUsSite ? '<li><a href="#why">Why us</a></li>' : '';
+
   return substitute(loadTemplate('site-shell.html'), {
     business_name: escapeHtml(args.lead.businessName),
     cta_href:      escapeHtml(ctaHref),
     cta_label:     escapeHtml(args.content.hero.ctaLabel),
-    brand_hero:    renderBrandHero(args.content, args.lead, photo, ctaHref),
-    stats:         renderStats(args.content, args.lead),
-    services:      renderServices(args.content),
-    testimonials:  renderTestimonials(args.content, args.lead),
-    contact:       renderContact(args.content, args.lead),
-    site_footer:   renderFooter(),
+    brand_hero:    renderBrandHero(content, args.lead, photo, ctaHref),
+    stats:         renderStats(content, args.lead),
+    why_nav_link:  whyNavLinkSite,
+    why_us:        renderWhyUs(content, args.lead),
+    services:      renderServices(content),
+    what_changes:  renderWhatChanges(content),
+    testimonials:  renderTestimonials(content, args.lead),
+    contact:       renderContact(content, args.lead),
+    site_footer:   renderFooter(content, args.lead, photo),
   });
 }
