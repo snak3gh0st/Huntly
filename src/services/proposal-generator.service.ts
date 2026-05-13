@@ -27,17 +27,17 @@ const IconSchema = z.enum(ICON_NAMES);
 
 export const SiteContentSchema = z.object({
   brand: z.object({
-    tagline:     z.string().min(1).max(80),
-    description: z.string().min(1).max(280),
+    tagline:     z.string().min(1).max(120),
+    description: z.string().min(1).max(500),
   }),
   services: z.array(z.object({
     icon:        IconSchema,
-    title:       z.string().min(1).max(60),
-    description: z.string().min(1).max(200),
+    title:       z.string().min(1).max(80),
+    description: z.string().min(1).max(320),
   })).min(4).max(8),
   testimonials: z.array(z.object({
-    quote:       z.string().min(1).max(300),
-    attribution: z.string().min(1).max(80),
+    quote:       z.string().min(1).max(400),
+    attribution: z.string().min(1).max(120),
   })).max(4),
   contact: z.object({
     headline: z.string().min(1).max(60),
@@ -47,19 +47,19 @@ export const SiteContentSchema = z.object({
     hours:    z.string().nullable(),
   }),
   proposalIntro: z.object({
-    salutation: z.string().min(1).max(80),
-    pitch:      z.string().min(1).max(400),
+    salutation: z.string().min(1).max(120),
+    pitch:      z.string().min(1).max(1000),
   }),
   diagnosis: z.object({
     bullets: z.array(z.object({
       icon:     IconSchema,
-      label:    z.string().min(1).max(80),
-      evidence: z.string().min(1).max(200),
+      label:    z.string().min(1).max(120),
+      evidence: z.string().min(1).max(320),
     })).min(2).max(5),
   }),
   pricingPitch: z.object({
-    headline:     z.string().min(1).max(100),
-    valueBullets: z.array(z.string().min(1).max(120)).min(2).max(4),
+    headline:     z.string().min(1).max(160),
+    valueBullets: z.array(z.string().min(1).max(160)).min(2).max(4),
   }),
   cta: z.object({
     primaryLabel: z.string().min(1).max(40),
@@ -104,13 +104,13 @@ Output STRICT JSON ONLY, matching this exact schema. No markdown. No prose aroun
 
 Schema:
 {
-  "brand": { "tagline": string<=80, "description": string<=280 },
-  "services": [ { "icon": IconName, "title": string<=60, "description": string<=200 } ]   // 4 to 8 items
-  "testimonials": [ { "quote": string<=300, "attribution": string<=80 } ]                  // 0 to 4 items
+  "brand": { "tagline": string<=120, "description": string<=500 },
+  "services": [ { "icon": IconName, "title": string<=80, "description": string<=320 } ]   // 4 to 8 items
+  "testimonials": [ { "quote": string<=400, "attribution": string<=120 } ]                 // 0 to 4 items
   "contact": { "headline": string<=60, "address": string|null, "phone": string|null, "whatsapp": string|null, "hours": string|null },
-  "proposalIntro": { "salutation": string<=80, "pitch": string<=400 },
-  "diagnosis": { "bullets": [ { "icon": IconName, "label": string<=80, "evidence": string<=200 } ] },   // 2 to 5
-  "pricingPitch": { "headline": string<=100, "valueBullets": [ string<=120 ] },                          // 2 to 4 bullets
+  "proposalIntro": { "salutation": string<=120, "pitch": string<=1000 },
+  "diagnosis": { "bullets": [ { "icon": IconName, "label": string<=120, "evidence": string<=320 } ] },  // 2 to 5
+  "pricingPitch": { "headline": string<=160, "valueBullets": [ string<=160 ] },                          // 2 to 4 bullets
   "cta": { "primaryLabel": string<=40, "reassurance": string<=120 }
 }
 
@@ -132,6 +132,7 @@ Rules:
    - No em-dashes (—) or double hyphens (--). Use commas, colons, semicolons, periods, or parentheses.
    - No "the future of [vertical]" framing.
 10. SPECIFIC OVER GENERIC — every line of copy must tie to a concrete signal in the lead's data: their actual review quotes, their actual service category, their actual location, their actual rating. If you cannot ground a line in real data, cut it. A line that could apply to any business in this category is wrong.
+11. CHARACTER LIMITS ARE HARD CONSTRAINTS. Every \`string<=N\` in the schema is enforced by validation — exceeding N causes the entire response to be rejected and rewritten. If a field would naturally exceed its limit, CONDENSE it: cut connective tissue, drop a sub-clause, trim adjectives. Do this BEFORE returning the JSON, not after. NEVER return a field that exceeds its limit. Count characters carefully on the longest fields (\`description\`, \`pitch\`, \`evidence\`).
 
 Return ONLY the JSON object.`;
 }
